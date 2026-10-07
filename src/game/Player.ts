@@ -2,7 +2,6 @@ import * as THREE from 'three'
 
 import {
   createCharacter,
-  type CharacterGender,
   type GameCharacter,
 } from '../characters/Character'
 
@@ -17,6 +16,9 @@ export class Player {
   public readonly group:
     THREE.Group
 
+  private readonly collisionSystem:
+    CollisionSystem
+
   private readonly keys:
     Record<string, boolean> = {}
 
@@ -30,12 +32,14 @@ export class Player {
   private readonly groundY = 0
 
   constructor(
-    gender: CharacterGender,
-    private readonly collisionSystem:
+    collisionSystem:
       CollisionSystem
   ) {
+    this.collisionSystem =
+      collisionSystem
+
     this.character =
-      createCharacter(gender)
+      createCharacter()
 
     this.group =
       this.character.group
@@ -171,7 +175,8 @@ export class Player {
         Math.atan2(
           movement.x,
           movement.z
-        ) + Math.PI
+        ) +
+        Math.PI
 
       let difference =
         targetRotation -
@@ -240,10 +245,7 @@ export class Player {
         0.78
     }
 
-    // ========================================================
     // JUMP + GRAVITY
-    // ========================================================
-
     if (!this.isGrounded) {
       this.verticalVelocity -=
         this.gravity * delta
@@ -290,7 +292,6 @@ export class Player {
     const current =
       this.group.position
 
-    // First try X movement.
     const nextX =
       current.clone()
 
@@ -309,12 +310,6 @@ export class Player {
         nextX.x
     }
 
-    // Then try Z separately.
-    //
-    // Doing X and Z separately
-    // lets the player slide along
-    // walls and trees instead of
-    // getting completely stuck.
     const nextZ =
       current.clone()
 

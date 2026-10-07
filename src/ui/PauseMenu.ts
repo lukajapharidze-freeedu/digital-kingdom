@@ -1,14 +1,17 @@
 export type PauseAction =
   | 'resume'
   | 'restart'
-  | 'change-character'
+  | 'change-grade'
 
 export class PauseMenu {
-  private readonly overlay: HTMLDivElement
+  private readonly overlay:
+    HTMLDivElement
+
   private visible = false
 
   private actionHandler:
-    ((action: PauseAction) => void) | null = null
+    ((action: PauseAction) => void)
+    | null = null
 
   constructor() {
     this.overlay =
@@ -26,7 +29,9 @@ export class PauseMenu {
           ♛
         </div>
 
-        <h2>თამაში შეჩერებულია</h2>
+        <h2>
+          თამაში შეჩერებულია
+        </h2>
 
         <p class="pause-subtitle">
           DIGITAL KINGDOM
@@ -50,15 +55,15 @@ export class PauseMenu {
 
           <button
             class="pause-button"
-            data-action="change-character"
+            data-action="change-grade"
             type="button"
           >
             <span class="pause-button-icon">
-              👤
+              🎓
             </span>
 
             <span>
-              გმირის შეცვლა
+              კლასის შეცვლა
             </span>
           </button>
 
@@ -96,27 +101,37 @@ export class PauseMenu {
           '[data-action]'
         )
 
-    buttons.forEach((button) => {
-      button.addEventListener(
-        'click',
-        () => {
-          const action =
-            button.dataset
-              .action as PauseAction
+    buttons.forEach(
+      (button) => {
+        button.addEventListener(
+          'click',
+          () => {
+            const action =
+              button.dataset.action
 
-          this.actionHandler?.(
-            action
-          )
-        }
-      )
-    })
+            if (
+              action === 'resume' ||
+              action === 'restart' ||
+              action === 'change-grade'
+            ) {
+              this.actionHandler?.(
+                action
+              )
+            }
+          }
+        )
+      }
+    )
   }
 
   public onAction(
     handler:
-      (action: PauseAction) => void
+      (
+        action: PauseAction
+      ) => void
   ) {
-    this.actionHandler = handler
+    this.actionHandler =
+      handler
   }
 
   public show() {

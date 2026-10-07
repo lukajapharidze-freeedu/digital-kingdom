@@ -5,19 +5,23 @@ export class GameCamera {
     THREE.PerspectiveCamera
 
   public yaw = 0
+  public pitch = 0.42
+  public distance = 11
 
-  private pitch = 0.42
-  private distance = 11
+  private readonly domElement:
+    HTMLElement
 
   private dragging = false
 
-  private previousMouseX = 0
-  private previousMouseY = 0
+  private lastMouseX = 0
+  private lastMouseY = 0
 
   constructor(
-    private readonly domElement:
-      HTMLElement
+    domElement: HTMLElement
   ) {
+    this.domElement =
+      domElement
+
     this.camera =
       new THREE.PerspectiveCamera(
         55,
@@ -27,11 +31,10 @@ export class GameCamera {
         200
       )
 
-    this.domElement
-      .addEventListener(
-        'mousedown',
-        this.onMouseDown
-      )
+    this.domElement.addEventListener(
+      'mousedown',
+      this.onMouseDown
+    )
 
     window.addEventListener(
       'mouseup',
@@ -43,11 +46,10 @@ export class GameCamera {
       this.onMouseMove
     )
 
-    this.domElement
-      .addEventListener(
-        'contextmenu',
-        this.onContextMenu
-      )
+    this.domElement.addEventListener(
+      'contextmenu',
+      this.onContextMenu
+    )
   }
 
   private onMouseDown = (
@@ -55,10 +57,10 @@ export class GameCamera {
   ) => {
     this.dragging = true
 
-    this.previousMouseX =
+    this.lastMouseX =
       event.clientX
 
-    this.previousMouseY =
+    this.lastMouseY =
       event.clientY
   }
 
@@ -75,20 +77,20 @@ export class GameCamera {
 
     const deltaX =
       event.clientX -
-      this.previousMouseX
+      this.lastMouseX
 
     const deltaY =
       event.clientY -
-      this.previousMouseY
+      this.lastMouseY
 
-    this.previousMouseX =
+    this.lastMouseX =
       event.clientX
 
-    this.previousMouseY =
+    this.lastMouseY =
       event.clientY
 
     this.yaw -=
-      deltaX * 0.006
+      deltaX * 0.005
 
     this.pitch +=
       deltaY * 0.004
@@ -97,7 +99,7 @@ export class GameCamera {
       THREE.MathUtils.clamp(
         this.pitch,
         0.15,
-        0.85
+        1.05
       )
   }
 
@@ -122,14 +124,14 @@ export class GameCamera {
       new THREE.Vector3(
         target.position.x +
           Math.sin(this.yaw) *
-          horizontal,
+            horizontal,
 
         target.position.y +
           vertical,
 
         target.position.z +
           Math.cos(this.yaw) *
-          horizontal
+            horizontal
       )
 
     this.camera.position.lerp(
@@ -147,8 +149,7 @@ export class GameCamera {
   public reset() {
     this.yaw = 0
     this.pitch = 0.42
-
-    this.dragging = false
+    this.distance = 11
   }
 
   public resize() {
@@ -158,5 +159,29 @@ export class GameCamera {
 
     this.camera
       .updateProjectionMatrix()
+  }
+
+  public destroy() {
+    this.domElement
+      .removeEventListener(
+        'mousedown',
+        this.onMouseDown
+      )
+
+    window.removeEventListener(
+      'mouseup',
+      this.onMouseUp
+    )
+
+    window.removeEventListener(
+      'mousemove',
+      this.onMouseMove
+    )
+
+    this.domElement
+      .removeEventListener(
+        'contextmenu',
+        this.onContextMenu
+      )
   }
 }

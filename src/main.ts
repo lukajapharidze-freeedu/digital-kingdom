@@ -1,8 +1,8 @@
 import './style.css'
 
 import {
-  showCharacterSelect,
-} from './ui/CharacterSelect'
+  showGradeSelect,
+} from './ui/GradeSelect'
 
 import {
   Game,
@@ -10,9 +10,11 @@ import {
 
 async function main() {
   const selection =
-    await showCharacterSelect()
+    await showGradeSelect()
 
-  new Game(selection.gender)
+  new Game(
+    selection.grade
+  )
 }
 
 main()

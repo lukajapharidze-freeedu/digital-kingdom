@@ -1,12 +1,9 @@
 import * as THREE from 'three'
 
 import {
-  type CharacterGender,
-} from '../characters/Character'
-
-import {
-  showCharacterSelect,
-} from '../ui/CharacterSelect'
+  showGradeSelect,
+  type Grade,
+} from '../ui/GradeSelect'
 
 import {
   PauseMenu,
@@ -51,13 +48,18 @@ export class Game {
   private readonly collisionSystem:
     CollisionSystem
 
+  private grade:
+    Grade
+
   private paused = false
 
-  private changingCharacter = false
+  private changingGrade = false
 
   constructor(
-    gender: CharacterGender
+    grade: Grade
   ) {
+    this.grade = grade
+
     this.scene =
       new THREE.Scene()
 
@@ -91,10 +93,10 @@ export class Game {
       this.renderer.domElement
     )
 
-    // Build world and receive
-    // its collision information.
     const world =
-      createWorld(this.scene)
+      createWorld(
+        this.scene
+      )
 
     this.collisionSystem =
       new CollisionSystem(
@@ -103,7 +105,6 @@ export class Game {
 
     this.player =
       new Player(
-        gender,
         this.collisionSystem
       )
 
@@ -143,10 +144,19 @@ export class Game {
 
   private createUI() {
     const ui =
-      document.createElement('div')
+      document.createElement(
+        'div'
+      )
 
     ui.className =
       'game-ui'
+
+    const gradeRoman =
+      this.grade === 2
+        ? 'II'
+        : this.grade === 3
+          ? 'III'
+          : 'IV'
 
     ui.innerHTML = `
       <div class="title">
@@ -154,16 +164,20 @@ export class Game {
       </div>
 
       <div class="stars">
-        ⭐ <span>0 / 5</span>
+        ⭐
+        <span>0 / 5</span>
       </div>
 
       <div class="welcome">
         <strong>
-          კეთილი იყოს შენი მობრძანება!
+          კეთილი იყოს შენი
+          მობრძანება!
         </strong>
 
         <span>
-          გამოიკვლიე ციფრული სამეფო ✨
+          ${gradeRoman} კლასი •
+          გამოიკვლიე ციფრული
+          სამეფო ✨
         </span>
       </div>
 
@@ -212,6 +226,29 @@ export class Game {
     )
   }
 
+  private updateGradeUI() {
+    const welcome =
+      document.querySelector(
+        '.welcome span'
+      )
+
+    if (!welcome) {
+      return
+    }
+
+    const gradeRoman =
+      this.grade === 2
+        ? 'II'
+        : this.grade === 3
+          ? 'III'
+          : 'IV'
+
+    welcome.textContent =
+      `${gradeRoman} კლასი • ` +
+      `გამოიკვლიე ციფრული ` +
+      `სამეფო ✨`
+  }
+
   private onKeyDown = (
     event: KeyboardEvent
   ) => {
@@ -223,7 +260,7 @@ export class Game {
     }
 
     if (
-      this.changingCharacter
+      this.changingGrade
     ) {
       return
     }
@@ -276,9 +313,9 @@ export class Game {
 
     if (
       action ===
-      'change-character'
+      'change-grade'
     ) {
-      void this.changeCharacter()
+      void this.changeGrade()
     }
   }
 
@@ -290,39 +327,30 @@ export class Game {
     this.resumeGame()
   }
 
-  private async changeCharacter() {
+  private async changeGrade() {
     if (
-      this.changingCharacter
+      this.changingGrade
     ) {
       return
     }
 
-    this.changingCharacter = true
+    this.changingGrade = true
 
     this.pauseMenu.hide()
 
     const selection =
-      await showCharacterSelect()
+      await showGradeSelect()
 
-    this.scene.remove(
-      this.player.group
-    )
+    this.grade =
+      selection.grade
 
-    this.player.destroy()
+    this.updateGradeUI()
 
-    this.player =
-      new Player(
-        selection.gender,
-        this.collisionSystem
-      )
-
-    this.scene.add(
-      this.player.group
-    )
+    this.player.reset()
 
     this.gameCamera.reset()
 
-    this.changingCharacter = false
+    this.changingGrade = false
 
     this.resumeGame()
   }

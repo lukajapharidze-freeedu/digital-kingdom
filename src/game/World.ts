@@ -261,82 +261,92 @@ export function createWorld(
     -10
   )
 
-  // ------------------------------------------------------------
-  // CASTLE COLLISION
-  //
-  // Castle front is split into:
-  //
-  //   [LEFT WALL] [DOOR] [RIGHT WALL]
-  //
-  // This lets us interact with the door later
-  // without allowing the player to walk through
-  // the castle.
-  // ------------------------------------------------------------
+  // ============================================================
+// CASTLE COLLISION
+// Matches the castle's 1.35 visual scale.
+// ============================================================
 
-  // Left tower
-  colliders.push({
-    type: 'circle',
-    x: -3.2,
-    z: -10,
-    radius: 1.35,
-    height: 7,
-  })
+const castleScale = 1.35
 
-  // Right tower
-  colliders.push({
-    type: 'circle',
-    x: 3.2,
-    z: -10,
-    radius: 1.35,
-    height: 7,
-  })
+// Left tower
+colliders.push({
+  type: 'circle',
+  x: -3.2 * castleScale,
+  z: -10,
+  radius: 1.35 * castleScale,
+  height: 7 * castleScale,
+})
 
-  // Main castle body — rear section.
-  //
-  // This prevents entering the castle
-  // from the sides or rear.
-  colliders.push({
-    type: 'box',
-    x: 0,
-    z: -10.65,
-    halfWidth: 2.5,
-    halfDepth: 0.65,
-    height: 7,
-  })
+// Right tower
+colliders.push({
+  type: 'circle',
+  x: 3.2 * castleScale,
+  z: -10,
+  radius: 1.35 * castleScale,
+  height: 7 * castleScale,
+})
 
-  // Left part of front wall
-  colliders.push({
-    type: 'box',
-    x: -1.65,
-    z: -8.75,
-    halfWidth: 0.85,
-    halfDepth: 0.65,
-    height: 5,
-  })
+// Rear / main body
+colliders.push({
+  type: 'box',
+  x: 0,
+  z:
+    -10 +
+    (-0.65 * castleScale),
+  halfWidth:
+    2.5 * castleScale,
+  halfDepth:
+    0.65 * castleScale,
+  height:
+    7 * castleScale,
+})
 
-  // Right part of front wall
-  colliders.push({
-    type: 'box',
-    x: 1.65,
-    z: -8.75,
-    halfWidth: 0.85,
-    halfDepth: 0.65,
-    height: 5,
-  })
+// Left front wall
+colliders.push({
+  type: 'box',
+  x:
+    -1.65 * castleScale,
+  z:
+    -10 +
+    (1.25 * castleScale),
+  halfWidth:
+    0.85 * castleScale,
+  halfDepth:
+    0.65 * castleScale,
+  height:
+    5 * castleScale,
+})
 
-  // Door.
-  //
-  // IMPORTANT:
-  // This is separate because in the next
-  // step this becomes an interactive object.
-  colliders.push({
-    type: 'box',
-    x: 0,
-    z: -8.62,
-    halfWidth: 0.68,
-    halfDepth: 0.18,
-    height: 3,
-  })
+// Right front wall
+colliders.push({
+  type: 'box',
+  x:
+    1.65 * castleScale,
+  z:
+    -10 +
+    (1.25 * castleScale),
+  halfWidth:
+    0.85 * castleScale,
+  halfDepth:
+    0.65 * castleScale,
+  height:
+    5 * castleScale,
+})
+
+// Door
+colliders.push({
+  type: 'box',
+  x: 0,
+  z:
+    -10 +
+    (1.38 * castleScale),
+  halfWidth:
+    0.68 * castleScale,
+  halfDepth:
+    0.18 * castleScale,
+  height:
+    3 * castleScale,
+})
 
   return {
     colliders,
@@ -697,6 +707,10 @@ function createCastle(
     0,
     z
   )
+
+castle.scale.setScalar(
+  1.35
+)
 
   enableShadows(castle)
 

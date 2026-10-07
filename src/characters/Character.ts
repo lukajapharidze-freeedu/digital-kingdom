@@ -1,7 +1,5 @@
 import * as THREE from 'three'
 
-export type CharacterGender = 'boy' | 'girl'
-
 export interface GameCharacter {
   group: THREE.Group
   leftArm: THREE.Group
@@ -10,346 +8,639 @@ export interface GameCharacter {
   rightLeg: THREE.Group
 }
 
-function mat(color: number) {
+function material(
+  color: number
+) {
   return new THREE.MeshStandardMaterial({
     color,
-    roughness: 0.9,
+    roughness: 0.82,
     flatShading: true,
   })
 }
 
-function shadow(mesh: THREE.Mesh) {
+function box(
+  width: number,
+  height: number,
+  depth: number,
+  color: number
+) {
+  const mesh =
+    new THREE.Mesh(
+      new THREE.BoxGeometry(
+        width,
+        height,
+        depth
+      ),
+      material(color)
+    )
+
   mesh.castShadow = true
   mesh.receiveShadow = true
+
   return mesh
 }
 
-export function createCharacter(
-  gender: CharacterGender
-): GameCharacter {
-  const character = new THREE.Group()
+export function createCharacter():
+  GameCharacter {
+  // ============================================================
+  // ROOT
+  //
+  // group = gameplay position.
+  // model = visual character.
+  //
+  // Keeping them separate lets group.position.y = 0
+  // represent the actual ground under the character.
+  // ============================================================
 
-  const skin = mat(0xf0b48d)
-  const hair = mat(
-    gender === 'boy'
-      ? 0x493027
-      : 0x5b3528
-  )
+  const group =
+    new THREE.Group()
 
-  const top = mat(
-    gender === 'boy'
-      ? 0xe94b3c
-      : 0x8e63d8
-  )
+  const model =
+    new THREE.Group()
 
-  const topDark = mat(
-    gender === 'boy'
-      ? 0xc83b32
-      : 0x7049ba
-  )
+  group.add(model)
 
-  const pants = mat(
-    gender === 'boy'
-      ? 0x2862aa
-      : 0x315b91
-  )
+  // ============================================================
+  // COLORS
+  // ============================================================
 
-  const shoes = mat(0xf6f4ed)
+  const dark =
+    0x292d30
 
-  const backpack = mat(
-    gender === 'boy'
-      ? 0xf1a629
-      : 0xf2a63b
-  )
+  const television =
+    0xb7b5b1
 
-  const backpackDark = mat(0xc87c18)
+  const televisionDark =
+    0x74716f
 
-  // ==========================================================
+  const screenFrame =
+    0xf1f1eb
+
+  const shirtRed =
+    0xa94137
+
+  const shortsBlue =
+    0x4164aa
+
+  const skin =
+    0xe3aa77
+
+  const shoe =
+    0x272d2e
+
+  // ============================================================
   // BODY
-  // ==========================================================
+  //
+  // Character faces toward -Z.
+  // ============================================================
 
-  const torso = shadow(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(1.05, 1.3, 0.65),
-      top
+  const torso =
+    box(
+      1.25,
+      1.25,
+      0.68,
+      shirtRed
     )
-  )
 
   torso.position.y = 1.85
-  character.add(torso)
 
-  // ==========================================================
-  // HEAD
-  // ==========================================================
+  model.add(torso)
 
-  const head = shadow(
-    new THREE.Mesh(
-      new THREE.SphereGeometry(
-        0.53,
-        14,
-        10
-      ),
+  const waist =
+    box(
+      1.2,
+      0.35,
+      0.7,
+      shortsBlue
+    )
+
+  waist.position.y = 1.08
+
+  model.add(waist)
+
+  // ============================================================
+  // TV HEAD
+  // ============================================================
+
+  const head =
+    new THREE.Group()
+
+  head.position.y = 3.15
+
+  const tvBody =
+    box(
+      2.05,
+      1.65,
+      0.92,
+      television
+    )
+
+  head.add(tvBody)
+
+  const tvBack =
+    box(
+      1.72,
+      1.35,
+      0.30,
+      televisionDark
+    )
+
+  tvBack.position.z = 0.53
+
+  head.add(tvBack)
+
+  const frame =
+    box(
+      1.68,
+      1.27,
+      0.08,
+      screenFrame
+    )
+
+  frame.position.z = -0.49
+
+  head.add(frame)
+
+  const screen =
+    box(
+      1.46,
+      1.04,
+      0.07,
+      dark
+    )
+
+  screen.position.z = -0.55
+
+  head.add(screen)
+
+  // ============================================================
+  // TV TEST PATTERN
+  // ============================================================
+
+  const testColors = [
+    0x50bfd1,
+    0xf4f2e7,
+    0xf6d632,
+    0x52b9c8,
+    0x72a94c,
+    0xa6549b,
+    0x42437d,
+    0x4fb8ce,
+  ]
+
+  const stripeWidth =
+    1.38 /
+    testColors.length
+
+  testColors.forEach(
+    (color, index) => {
+      const stripe =
+        box(
+          stripeWidth,
+          0.19,
+          0.025,
+          color
+        )
+
+      stripe.position.set(
+        -0.69 +
+          stripeWidth / 2 +
+          index *
+            stripeWidth,
+        0.40,
+        -0.595
+      )
+
+      head.add(stripe)
+    }
+  )
+
+  testColors.forEach(
+    (color, index) => {
+      const stripe =
+        box(
+          stripeWidth,
+          0.32,
+          0.025,
+          color
+        )
+
+      stripe.position.set(
+        -0.69 +
+          stripeWidth / 2 +
+          index *
+            stripeWidth,
+        -0.31,
+        -0.595
+      )
+
+      head.add(stripe)
+    }
+  )
+
+  // ============================================================
+  // FACE
+  // ============================================================
+
+  const faceBand =
+    box(
+      1.38,
+      0.39,
+      0.035,
+      0x303436
+    )
+
+  faceBand.position.set(
+    0,
+    0.06,
+    -0.62
+  )
+
+  head.add(faceBand)
+
+  const leftEye =
+    box(
+      0.30,
+      0.17,
+      0.035,
+      0x4fc1d4
+    )
+
+  leftEye.position.set(
+    -0.38,
+    0.07,
+    -0.65
+  )
+
+  head.add(leftEye)
+
+  const rightEye =
+    box(
+      0.30,
+      0.17,
+      0.035,
+      0xe85c54
+    )
+
+  rightEye.position.set(
+    0.38,
+    0.07,
+    -0.65
+  )
+
+  head.add(rightEye)
+
+  const mouth =
+    box(
+      0.32,
+      0.07,
+      0.035,
+      0x171a1b
+    )
+
+  mouth.position.set(
+    0,
+    -0.55,
+    -0.64
+  )
+
+  head.add(mouth)
+
+  // ============================================================
+  // ANTENNAS
+  // ============================================================
+
+  const leftAntenna =
+    new THREE.Group()
+
+  const leftStem =
+    box(
+      0.12,
+      0.72,
+      0.12,
+      dark
+    )
+
+  leftStem.position.y =
+    0.32
+
+  leftAntenna.add(
+    leftStem
+  )
+
+  const leftTip =
+    box(
+      0.30,
+      0.30,
+      0.30,
+      dark
+    )
+
+  leftTip.position.y =
+    0.72
+
+  leftAntenna.add(
+    leftTip
+  )
+
+  leftAntenna.position.set(
+    -0.48,
+    0.88,
+    0
+  )
+
+  leftAntenna.rotation.z =
+    -0.55
+
+  head.add(
+    leftAntenna
+  )
+
+  const rightAntenna =
+    new THREE.Group()
+
+  const rightStem =
+    box(
+      0.12,
+      0.72,
+      0.12,
+      dark
+    )
+
+  rightStem.position.y =
+    0.32
+
+  rightAntenna.add(
+    rightStem
+  )
+
+  const rightTip =
+    box(
+      0.30,
+      0.30,
+      0.30,
+      dark
+    )
+
+  rightTip.position.y =
+    0.72
+
+  rightAntenna.add(
+    rightTip
+  )
+
+  rightAntenna.position.set(
+    0.48,
+    0.88,
+    0
+  )
+
+  rightAntenna.rotation.z =
+    0.55
+
+  head.add(
+    rightAntenna
+  )
+
+  model.add(head)
+
+  // ============================================================
+  // ARMS
+  // ============================================================
+
+  const leftArm =
+    new THREE.Group()
+
+  leftArm.position.set(
+    -0.78,
+    2.30,
+    0
+  )
+
+  const leftSleeve =
+    box(
+      0.34,
+      0.72,
+      0.40,
+      shirtRed
+    )
+
+  leftSleeve.position.y =
+    -0.32
+
+  leftArm.add(
+    leftSleeve
+  )
+
+  const leftHand =
+    box(
+      0.30,
+      0.30,
+      0.34,
       skin
     )
+
+  leftHand.position.y =
+    -0.83
+
+  leftArm.add(
+    leftHand
   )
 
-  head.position.y = 2.85
-  character.add(head)
+  model.add(leftArm)
 
-  // ==========================================================
-  // HAIR
-  // ==========================================================
+  const rightArm =
+    new THREE.Group()
 
-  if (gender === 'boy') {
-    const boyHair = shadow(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          0.56,
-          10,
-          8,
-          0,
-          Math.PI * 2,
-          0,
-          Math.PI / 2
-        ),
-        hair
-      )
-    )
-
-    boyHair.position.y = 3.03
-    character.add(boyHair)
-  } else {
-    const topHair = shadow(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          0.57,
-          12,
-          10,
-          0,
-          Math.PI * 2,
-          0,
-          Math.PI * 0.63
-        ),
-        hair
-      )
-    )
-
-    topHair.position.y = 3.02
-    character.add(topHair)
-
-    const ponytail = shadow(
-      new THREE.Mesh(
-        new THREE.IcosahedronGeometry(
-          0.34,
-          1
-        ),
-        hair
-      )
-    )
-
-    // Character faces toward -Z.
-    // +Z is therefore the back.
-    ponytail.position.set(
-      0,
-      2.72,
-      0.52
-    )
-
-    character.add(ponytail)
-  }
-
-  // ==========================================================
-  // HOOD / COLLAR
-  // ==========================================================
-
-  const collar = shadow(
-    new THREE.Mesh(
-      new THREE.TorusGeometry(
-        0.42,
-        0.11,
-        8,
-        12
-      ),
-      topDark
-    )
+  rightArm.position.set(
+    0.78,
+    2.30,
+    0
   )
 
-  collar.position.set(0, 2.43, 0)
-  collar.rotation.x = Math.PI / 2
-
-  character.add(collar)
-
-  // ==========================================================
-  // ARMS
-  // ==========================================================
-
-  function createArm(x: number) {
-    const pivot = new THREE.Group()
-
-    pivot.position.set(x, 2.25, 0)
-
-    const arm = shadow(
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          0.32,
-          1.05,
-          0.38
-        ),
-        top
-      )
+  const rightSleeve =
+    box(
+      0.34,
+      0.72,
+      0.40,
+      shirtRed
     )
 
-    arm.position.y = -0.5
+  rightSleeve.position.y =
+    -0.32
 
-    const hand = shadow(
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          0.19,
-          8,
-          6
-        ),
-        skin
-      )
+  rightArm.add(
+    rightSleeve
+  )
+
+  const rightHand =
+    box(
+      0.30,
+      0.30,
+      0.34,
+      skin
     )
 
-    hand.position.y = -1.05
+  rightHand.position.y =
+    -0.83
 
-    pivot.add(arm, hand)
-    character.add(pivot)
+  rightArm.add(
+    rightHand
+  )
 
-    return pivot
-  }
+  model.add(rightArm)
 
-  const leftArm = createArm(-0.68)
-  const rightArm = createArm(0.68)
-
-  // ==========================================================
+  // ============================================================
   // LEGS
-  // ==========================================================
+  // ============================================================
 
-  function createLeg(x: number) {
-    const pivot = new THREE.Group()
+  const leftLeg =
+    new THREE.Group()
 
-    pivot.position.set(x, 1.2, 0)
+  leftLeg.position.set(
+    -0.34,
+    0.92,
+    0
+  )
 
-    const leg = shadow(
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          0.38,
-          1,
-          0.44
-        ),
-        pants
-      )
+  const leftLegPart =
+    box(
+      0.43,
+      0.72,
+      0.48,
+      shortsBlue
     )
 
-    leg.position.y = -0.5
+  leftLegPart.position.y =
+    -0.30
 
-    const shoe = shadow(
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          0.43,
-          0.25,
-          0.65
-        ),
-        shoes
-      )
+  leftLeg.add(
+    leftLegPart
+  )
+
+  const leftAnkle =
+    box(
+      0.40,
+      0.23,
+      0.45,
+      skin
     )
 
-    shoe.position.set(
-      0,
-      -1.05,
-      -0.1
+  leftAnkle.position.y =
+    -0.75
+
+  leftLeg.add(
+    leftAnkle
+  )
+
+  const leftShoe =
+    box(
+      0.47,
+      0.27,
+      0.72,
+      shoe
     )
 
-    pivot.add(leg, shoe)
-    character.add(pivot)
+  leftShoe.position.set(
+    0,
+    -0.99,
+    -0.10
+  )
 
-    return pivot
-  }
+  leftLeg.add(
+    leftShoe
+  )
 
-  const leftLeg = createLeg(-0.27)
-  const rightLeg = createLeg(0.27)
+  model.add(leftLeg)
 
-  // ==========================================================
-  // BACKPACK
+  const rightLeg =
+    new THREE.Group()
+
+  rightLeg.position.set(
+    0.34,
+    0.92,
+    0
+  )
+
+  const rightLegPart =
+    box(
+      0.43,
+      0.72,
+      0.48,
+      shortsBlue
+    )
+
+  rightLegPart.position.y =
+    -0.30
+
+  rightLeg.add(
+    rightLegPart
+  )
+
+  const rightAnkle =
+    box(
+      0.40,
+      0.23,
+      0.45,
+      skin
+    )
+
+  rightAnkle.position.y =
+    -0.75
+
+  rightLeg.add(
+    rightAnkle
+  )
+
+  const rightShoe =
+    box(
+      0.47,
+      0.27,
+      0.72,
+      shoe
+    )
+
+  rightShoe.position.set(
+    0,
+    -0.99,
+    -0.10
+  )
+
+  rightLeg.add(
+    rightShoe
+  )
+
+  model.add(rightLeg)
+
+  // ============================================================
+  // SCALE + GROUND ALIGNMENT
+  // ============================================================
+
+  // Smaller than the previous 0.78.
+  // This gives the castle/world a much larger sense of scale.
+  const characterScale =
+    0.42
+
+  model.scale.setScalar(
+    characterScale
+  )
+
+  // Lowest unscaled point:
   //
-  // IMPORTANT:
-  // Character faces -Z, so backpack belongs on +Z.
-  // ==========================================================
-
-  const bag = shadow(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(
-        0.8,
-        0.95,
-        0.3
-      ),
-      backpack
-    )
-  )
-
-  bag.position.set(
-    0,
-    1.88,
-    0.48
-  )
-
-  character.add(bag)
-
-  const pocket = shadow(
-    new THREE.Mesh(
-      new THREE.BoxGeometry(
-        0.5,
-        0.38,
-        0.14
-      ),
-      backpackDark
-    )
-  )
-
-  pocket.position.set(
-    0,
-    1.65,
-    0.69
-  )
-
-  character.add(pocket)
-
-  // Backpack straps on the shoulders
-
-  const strapGeometry =
-    new THREE.BoxGeometry(
-      0.1,
-      0.9,
-      0.08
-    )
-
-  const strapMaterial = topDark
-
-  const leftStrap = shadow(
-    new THREE.Mesh(
-      strapGeometry,
-      strapMaterial
-    )
-  )
-
-  leftStrap.position.set(
-    -0.32,
-    1.9,
-    -0.37
-  )
-
-  const rightStrap = leftStrap.clone()
-  rightStrap.position.x = 0.32
-
-  character.add(
-    leftStrap,
-    rightStrap
-  )
+  // leg pivot       0.92
+  // shoe center    -0.99
+  // half shoe      -0.135
+  // ---------------------
+  // bottom          -0.205
+  //
+  // After scaling, move the complete visual model upward
+  // so its shoe sole sits exactly at local Y = 0.
+  model.position.y =
+    0.205 *
+    characterScale
 
   return {
-    group: character,
+    group,
     leftArm,
     rightArm,
     leftLeg,
