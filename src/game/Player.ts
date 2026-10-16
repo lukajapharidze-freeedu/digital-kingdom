@@ -1,29 +1,19 @@
-import * as THREE from 'three'
 
+import * as THREE from 'three'
 import {
   createCharacter,
   type GameCharacter,
 } from '../characters/Character'
-
-import {
-  CollisionSystem,
-} from './Collision'
+import { CollisionSystem } from './Collision'
 
 export class Player {
-  public readonly character:
-    GameCharacter
+  public readonly character: GameCharacter
+  public readonly group: THREE.Group
 
-  public readonly group:
-    THREE.Group
-
-  private readonly collisionSystem:
-    CollisionSystem
-
-  private readonly keys:
-    Record<string, boolean> = {}
+  private collisionSystem: CollisionSystem
+  private readonly keys: Record<string, boolean> = {}
 
   private walkTime = 0
-
   private verticalVelocity = 0
   private isGrounded = true
 
@@ -31,39 +21,23 @@ export class Player {
   private readonly jumpForce = 7.2
   private readonly groundY = 0
 
-  constructor(
-    collisionSystem:
-      CollisionSystem
-  ) {
-    this.collisionSystem =
-      collisionSystem
+  private worldRadius = 12.5
+  private spawnX = 0
+  private spawnZ = 7
 
-    this.character =
-      createCharacter()
+  constructor(collisionSystem: CollisionSystem) {
+    this.collisionSystem = collisionSystem
+    this.character = createCharacter()
+    this.group = this.character.group
 
-    this.group =
-      this.character.group
+    this.group.position.set(0, this.groundY, 7)
 
-    this.group.position.set(
-      0,
-      this.groundY,
-      7
-    )
-
-    window.addEventListener(
-      'keydown',
-      this.onKeyDown
-    )
-
-    window.addEventListener(
-      'keyup',
-      this.onKeyUp
-    )
+    window.addEventListener('keydown', this.onKeyDown)
+    window.addEventListener('keyup', this.onKeyUp)
+    window.addEventListener('blur', this.clearKeys)
   }
 
-  private onKeyDown = (
-    event: KeyboardEvent
-  ) => {
+  private onKeyDown = (event: KeyboardEvent) => {
     this.keys[event.code] = true
 
     if (
@@ -71,334 +45,172 @@ export class Player {
       this.isGrounded &&
       !event.repeat
     ) {
-      this.jump()
+      this.verticalVelocity = this.jumpForce
+      this.isGrounded = false
     }
   }
 
-  private onKeyUp = (
-    event: KeyboardEvent
-  ) => {
+  private onKeyUp = (event: KeyboardEvent) => {
     this.keys[event.code] = false
   }
 
-  private jump() {
-    this.verticalVelocity =
-      this.jumpForce
-
-    this.isGrounded = false
+  private clearKeys = () => {
+    for (const key in this.keys) {
+      this.keys[key] = false
+    }
   }
 
-  public update(
-    delta: number,
-    cameraYaw: number
+  public enterWorld(
+    collisionSystem: CollisionSystem,
+    x: number,
+    z: number,
+    radius: number,
   ) {
-    const speed = 5.2
+    this.collisionSystem = collisionSystem
+    this.spawnX = x
+    this.spawnZ = z
+    this.worldRadius = radius
+    this.reset()
+  }
 
+  public update(delta: number, cameraYaw: number) {
+    const speed = 5.2
     let inputX = 0
     let inputZ = 0
 
-    if (
-      this.keys['KeyW'] ||
-      this.keys['ArrowUp']
-    ) {
-      inputZ -= 1
-    }
+    if (this.keys['KeyW'] || this.keys['ArrowUp']) inputZ--
+    if (this.keys['KeyS'] || this.keys['ArrowDown']) inputZ++
+    if (this.keys['KeyA'] || this.keys['ArrowLeft']) inputX--
+    if (this.keys['KeyD'] || this.keys['ArrowRight']) inputX++
 
-    if (
-      this.keys['KeyS'] ||
-      this.keys['ArrowDown']
-    ) {
-      inputZ += 1
-    }
-
-    if (
-      this.keys['KeyA'] ||
-      this.keys['ArrowLeft']
-    ) {
-      inputX -= 1
-    }
-
-    if (
-      this.keys['KeyD'] ||
-      this.keys['ArrowRight']
-    ) {
-      inputX += 1
-    }
-
-    const moving =
-      inputX !== 0 ||
-      inputZ !== 0
+    const moving = inputX !== 0 || inputZ !== 0
 
     if (moving) {
-      const input =
-        new THREE.Vector3(
-          inputX,
-          0,
-          inputZ
-        ).normalize()
+      const input = new THREE.Vector3(
+        inputX, 0, inputZ
+      ).normalize()
 
-      const forward =
-        new THREE.Vector3(
-          -Math.sin(cameraYaw),
-          0,
-          -Math.cos(cameraYaw)
-        )
-
-      const right =
-        new THREE.Vector3(
-          Math.cos(cameraYaw),
-          0,
-          -Math.sin(cameraYaw)
-        )
-
-      const movement =
-        new THREE.Vector3()
-
-      movement.addScaledVector(
-        forward,
-        -input.z
+      const forward = new THREE.Vector3(
+        -Math.sin(cameraYaw), 0, -Math.cos(cameraYaw)
       )
 
-      movement.addScaledVector(
-        right,
-        input.x
+      const right = new THREE.Vector3(
+        Math.cos(cameraYaw), 0, -Math.sin(cameraYaw)
       )
 
+      const movement = new THREE.Vector3()
+      movement.addScaledVector(forward, -input.z)
+      movement.addScaledVector(right, input.x)
       movement.normalize()
 
-      this.moveWithCollision(
-        movement,
-        speed * delta
-      )
+      this.moveWithCollision(movement, speed * delta)
 
       const targetRotation =
-        Math.atan2(
-          movement.x,
-          movement.z
-        ) +
-        Math.PI
+        Math.atan2(movement.x, movement.z) + Math.PI
 
-      let difference =
-        targetRotation -
-        this.group.rotation.y
-
-      difference =
-        Math.atan2(
-          Math.sin(difference),
-          Math.cos(difference)
-        )
+      const difference = Math.atan2(
+        Math.sin(targetRotation - this.group.rotation.y),
+        Math.cos(targetRotation - this.group.rotation.y)
+      )
 
       this.group.rotation.y +=
-        difference *
-        Math.min(
-          1,
-          delta * 12
-        )
+        difference * Math.min(1, delta * 12)
 
       if (this.isGrounded) {
-        this.walkTime +=
-          delta * 10
+        this.walkTime += delta * 10
 
-        const legSwing =
-          Math.sin(
-            this.walkTime
-          ) * 0.55
+        const legSwing = Math.sin(this.walkTime) * 0.55
+        const armSwing = Math.sin(this.walkTime) * 0.45
 
-        const armSwing =
-          Math.sin(
-            this.walkTime
-          ) * 0.45
-
-        this.character
-          .leftLeg.rotation.x =
-          legSwing
-
-        this.character
-          .rightLeg.rotation.x =
-          -legSwing
-
-        this.character
-          .leftArm.rotation.x =
-          -armSwing
-
-        this.character
-          .rightArm.rotation.x =
-          armSwing
+        this.character.leftLeg.rotation.x = legSwing
+        this.character.rightLeg.rotation.x = -legSwing
+        this.character.leftArm.rotation.x = -armSwing
+        this.character.rightArm.rotation.x = armSwing
       }
-    } else if (
-      this.isGrounded
-    ) {
-      this.character
-        .leftLeg.rotation.x *=
-        0.78
-
-      this.character
-        .rightLeg.rotation.x *=
-        0.78
-
-      this.character
-        .leftArm.rotation.x *=
-        0.78
-
-      this.character
-        .rightArm.rotation.x *=
-        0.78
+    } else if (this.isGrounded) {
+      this.character.leftLeg.rotation.x *= 0.78
+      this.character.rightLeg.rotation.x *= 0.78
+      this.character.leftArm.rotation.x *= 0.78
+      this.character.rightArm.rotation.x *= 0.78
     }
 
-    // JUMP + GRAVITY
     if (!this.isGrounded) {
-      this.verticalVelocity -=
-        this.gravity * delta
+      this.verticalVelocity -= this.gravity * delta
+      this.group.position.y += this.verticalVelocity * delta
 
-      this.group.position.y +=
-        this.verticalVelocity *
-        delta
+      this.character.leftLeg.rotation.x = -0.25
+      this.character.rightLeg.rotation.x = 0.25
+      this.character.leftArm.rotation.x = -0.35
+      this.character.rightArm.rotation.x = -0.35
 
-      this.character
-        .leftLeg.rotation.x =
-        -0.25
-
-      this.character
-        .rightLeg.rotation.x =
-        0.25
-
-      this.character
-        .leftArm.rotation.x =
-        -0.35
-
-      this.character
-        .rightArm.rotation.x =
-        -0.35
-
-      if (
-        this.group.position.y <=
-        this.groundY
-      ) {
-        this.group.position.y =
-          this.groundY
-
+      if (this.group.position.y <= this.groundY) {
+        this.group.position.y = this.groundY
         this.verticalVelocity = 0
         this.isGrounded = true
       }
     }
 
-    this.keepOnIsland()
+    this.keepInsideWorld()
   }
 
   private moveWithCollision(
     direction: THREE.Vector3,
     distance: number
   ) {
-    const current =
-      this.group.position
+    const current = this.group.position
 
-    const nextX =
-      current.clone()
+    const nextX = current.clone()
+    nextX.x += direction.x * distance
 
-    nextX.x +=
-      direction.x *
-      distance
-
-    if (
-      this.collisionSystem
-        .canMoveTo(
-          nextX,
-          current.y
-        )
-    ) {
-      current.x =
-        nextX.x
+    if (this.collisionSystem.canMoveTo(nextX, current.y)) {
+      current.x = nextX.x
     }
 
-    const nextZ =
-      current.clone()
+    const nextZ = current.clone()
+    nextZ.z += direction.z * distance
 
-    nextZ.z +=
-      direction.z *
-      distance
-
-    if (
-      this.collisionSystem
-        .canMoveTo(
-          nextZ,
-          current.y
-        )
-    ) {
-      current.z =
-        nextZ.z
+    if (this.collisionSystem.canMoveTo(nextZ, current.y)) {
+      current.z = nextZ.z
     }
   }
 
-  private keepOnIsland() {
-    const maxRadius = 12.5
+  private keepInsideWorld() {
+    const x = this.group.position.x
+    const z = this.group.position.z
+    const distance = Math.hypot(x, z)
 
-    const x =
-      this.group.position.x
+    if (distance <= this.worldRadius) return
 
-    const z =
-      this.group.position.z
-
-    const distance =
-      Math.sqrt(
-        x * x +
-        z * z
-      )
-
-    if (
-      distance <= maxRadius
-    ) {
-      return
-    }
-
-    const angle =
-      Math.atan2(
-        z,
-        x
-      )
-
+    const angle = Math.atan2(z, x)
     this.group.position.x =
-      Math.cos(angle) *
-      maxRadius
-
+      Math.cos(angle) * this.worldRadius
     this.group.position.z =
-      Math.sin(angle) *
-      maxRadius
+      Math.sin(angle) * this.worldRadius
   }
 
   public reset() {
     this.group.position.set(
-      0,
+      this.spawnX,
       this.groundY,
-      7
+      this.spawnZ
     )
 
-    this.group.rotation.set(
-      0,
-      0,
-      0
-    )
-
+    this.group.rotation.set(0, 0, 0)
     this.verticalVelocity = 0
     this.isGrounded = true
     this.walkTime = 0
 
-    for (
-      const key
-      in this.keys
-    ) {
-      this.keys[key] = false
-    }
+    this.character.leftArm.rotation.x = 0
+    this.character.rightArm.rotation.x = 0
+    this.character.leftLeg.rotation.x = 0
+    this.character.rightLeg.rotation.x = 0
+
+    this.clearKeys()
   }
 
   public destroy() {
-    window.removeEventListener(
-      'keydown',
-      this.onKeyDown
-    )
-
-    window.removeEventListener(
-      'keyup',
-      this.onKeyUp
-    )
+    window.removeEventListener('keydown', this.onKeyDown)
+    window.removeEventListener('keyup', this.onKeyUp)
+    window.removeEventListener('blur', this.clearKeys)
   }
 }
