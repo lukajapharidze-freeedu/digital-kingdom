@@ -23,6 +23,11 @@ import {
   type KingdomBuilding,
 } from '../worlds/KingdomWorld'
 
+import {
+  DayNightCycle,
+  type DayPhase,
+} from '../worlds/DayNightCycle'
+
 type WorldName = 'island' | 'kingdom'
 
 const FORGE_INTRO_TEXT =
@@ -49,6 +54,9 @@ export class Game {
   private readonly islandCollision: CollisionSystem
   private readonly kingdomCollision: CollisionSystem
   private readonly kingdom: KingdomWorldData
+  private readonly sun: THREE.DirectionalLight | null
+  private readonly cycle: DayNightCycle | null
+  private lastTimeLabel = ''
 
   private readonly interactionPrompt: HTMLDivElement
   private readonly locationLabel: HTMLDivElement
@@ -123,6 +131,33 @@ export class Game {
     )
 
     this.clock = new THREE.Clock()
+
+    // დღე/საღამო/ღამის ციკლი მუშაობს მხოლოდ სამეფოში;
+    // საწყის კუნძულზე სცენა ზუსტად ისე რჩება, როგორც იყო.
+    this.sun =
+      this.scene.children.find(
+        (object): object is THREE.DirectionalLight =>
+          object instanceof THREE.DirectionalLight
+      ) ?? null
+
+    const ambient = this.scene.children.find(
+      (object): object is THREE.HemisphereLight =>
+        object instanceof THREE.HemisphereLight
+    )
+
+    this.cycle = this.sun
+      ? new DayNightCycle({
+          scene: this.scene,
+          sun: this.sun,
+          ambient,
+          camera: this.gameCamera.camera,
+          world: this.kingdom,
+          startHour: 10,
+          dayLengthSeconds: 300,
+        })
+      : null
+
+    this.cycle?.setEnabled(false)
 
     this.createUI()
 
@@ -200,6 +235,7 @@ export class Game {
         <div>🖱️ კამერა</div>
         <div><kbd>SPACE</kbd> ახტომა</div>
         <div><kbd>E</kbd> ინტერაქცია</div>
+        <div><kbd>T</kbd> დრო (დღე / საღამო / ღამე)</div>
         <div><kbd>ESC</kbd> მენიუ</div>
       </div>
     `
@@ -217,10 +253,42 @@ export class Game {
   }
 
   private updateLocationLabel() {
+    if (this.currentWorld === 'island' || !this.cycle) {
+      this.locationLabel.textContent =
+        this.currentWorld === 'island'
+          ? '🏝️ საწყისი კუნძული'
+          : '🏰 ციფრული სამეფოს ეზო'
+      return
+    }
+
+    const icons: Record<DayPhase, string> = {
+      dawn: '🌅',
+      day: '☀️',
+      evening: '🌇',
+      night: '🌙',
+    }
+
+    this.lastTimeLabel = this.cycle.timeLabel
     this.locationLabel.textContent =
-      this.currentWorld === 'island'
-        ? '🏝️ საწყისი კუნძული'
-        : '🏰 ციფრული სამეფოს ეზო'
+      `🏰 ციფრული სამეფოს ეზო • ${icons[this.cycle.phase]} ${this.lastTimeLabel}`
+  }
+
+  // სამეფოს გარშემო უფრო დიდ ფართობზე უნდა ჩანდეს ჩრდილები
+  private setShadowRange(range: number, mapSize: number) {
+    if (!this.sun) return
+
+    const shadow = this.sun.shadow
+    shadow.camera.left = -range
+    shadow.camera.right = range
+    shadow.camera.top = range
+    shadow.camera.bottom = -range
+    shadow.camera.updateProjectionMatrix()
+
+    if (shadow.mapSize.x !== mapSize) {
+      shadow.mapSize.set(mapSize, mapSize)
+      shadow.map?.dispose()
+      shadow.map = null
+    }
   }
 
   private distanceTo(x: number, z: number) {
@@ -650,6 +718,8 @@ export class Game {
     }
 
     this.kingdom.group.visible = true
+    this.cycle?.setEnabled(true)
+    this.setShadowRange(48, 4096)
 
     this.player.enterWorld(
       this.kingdomCollision,
@@ -667,6 +737,8 @@ export class Game {
     this.closeForgeModal()
     this.currentWorld = 'island'
     this.kingdom.group.visible = false
+    this.cycle?.setEnabled(false)
+    this.setShadowRange(25, 2048)
 
     for (const object of this.islandObjects) {
       object.visible = true
@@ -713,6 +785,20 @@ export class Game {
       } else {
         this.pauseGame()
       }
+      return
+    }
+
+    if (
+      event.code === 'KeyT' &&
+      !event.repeat &&
+      !this.paused &&
+      this.currentWorld === 'kingdom' &&
+      this.cycle
+    ) {
+      const order: DayPhase[] = ['day', 'evening', 'night', 'dawn']
+      const next = order[(order.indexOf(this.cycle.phase) + 1) % order.length]
+      this.cycle.setPhase(next)
+      this.updateLocationLabel()
       return
     }
 
@@ -856,6 +942,12 @@ export class Game {
 
       if (this.currentWorld === 'kingdom') {
         this.kingdom.animals.update(delta)
+        this.kingdom.update(delta)
+        this.cycle?.update(delta)
+
+        if (this.cycle && this.cycle.timeLabel !== this.lastTimeLabel) {
+          this.updateLocationLabel()
+        }
       }
 
       this.gameCamera.update(this.player.group)

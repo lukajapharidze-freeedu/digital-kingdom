@@ -2,6 +2,13 @@ import * as THREE from 'three'
 import type { WorldCollider } from '../game/Collision'
 import { decorateKingdom } from './KingdomDecorations'
 import { KingdomAnimals } from './KingdomAnimals'
+import { NightRig } from './KingdomNight'
+import {
+  type Animator, type BuildContext, P, make, block, cyl, cone, group, place,
+  cylG, icoG, octG, torusG, coneG,
+} from './KingdomKit'
+import { buildCastle, buildKnowledgeTower, buildAcademy, buildLibrary } from './KingdomBuildings'
+import { buildMarket, buildForge, buildTreasury, buildGate } from './KingdomWorkshops'
 
 export type KingdomBuildingId =
   | 'knowledge' | 'academy' | 'library'
@@ -21,118 +28,164 @@ export interface KingdomWorldData {
   spawn: THREE.Vector3
   radius: number
   animals: KingdomAnimals
+  /** ანიმაციები (კვამლი, დროშები, წყალი, კრისტალები...). ყოველ კადრზე გამოიძახე. */
+  update: (dt: number) => void
+  /** 0 — დღე, 1 — ღამე. ჩვეულებრივ DayNightCycle იძახებს. */
+  setNightLevel: (level: number) => void
+  night: NightRig
 }
 
-const material = (color: number, metalness = 0) =>
-  new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness, flatShading: true })
+const grass = make(0x78c75c)
+const soil = make(0x936342)
+const soilDark = make(0x6f4a30)
+const pathMat = make(0xdcc8a1)
+const leaves = make(0x4ba853)
+const leavesLight = make(0x78c75c)
+const pine = make(0x2f7d4a)
+const pineLight = make(0x3f9a5c)
+const birchLeaf = make(0x9bd35f)
+const rockMat = make(0xcfc4a6)
 
-const stone = material(0xe8dcc0)
-const trim = material(0xb9a783)
-const blue = material(0x347ec4)
-const darkBlue = material(0x24507e)
-const gold = material(0xf3bb46, 0.15)
-const grass = material(0x78c75c)
-const soil = material(0x936342)
-const pathMat = material(0xdcc8a1)
-const wood = material(0x855333)
-const leaves = material(0x4ba853)
-
-function mesh(parent: THREE.Object3D, geometry: THREE.BufferGeometry,
-  mat: THREE.Material, x = 0, y = 0, z = 0): THREE.Mesh {
-  const object = new THREE.Mesh(geometry, mat)
-  object.position.set(x, y, z)
-  object.castShadow = true
-  object.receiveShadow = true
-  parent.add(object)
-  return object
+function pavedPath(parent: THREE.Object3D, x: number, z: number, w: number, d: number) {
+  block(parent, w, 0.08, d, pathMat, x, 0, z, false)
 }
 
-function box(parent: THREE.Object3D, w: number, h: number, d: number,
-  mat: THREE.Material, x = 0, y = h / 2, z = 0) {
-  return mesh(parent, new THREE.BoxGeometry(w, h, d), mat, x, y, z)
+/** ხეები: მრგვალი, ფიჭვი, არყი — ოდნავ ირხევა ქარში */
+function tree(ctx: BuildContext, parent: THREE.Object3D, x: number, z: number, scale: number, kind: number) {
+  const t = group(parent, x, 0, z)
+  const crown = group(t, 0, 0, 0)
+  if (kind === 0) {
+    cyl(t, 0.25 * scale, 0.35 * scale, 1.7 * scale, P.wood, 0, 0, 0, 6)
+    place(crown, icoG(1.1 * scale), leaves, 0, 2.2 * scale, 0)
+    place(crown, icoG(0.85 * scale), leavesLight, 0.4 * scale, 2.65 * scale, 0)
+  } else if (kind === 1) {
+    cyl(t, 0.2 * scale, 0.3 * scale, 1.2 * scale, P.darkWood, 0, 0, 0, 6)
+    for (let i = 0; i < 3; i++) {
+      cone(crown, (1.45 - i * 0.38) * scale, 1.7 * scale, i % 2 ? pineLight : pine, 0, (0.9 + i * 1.05) * scale, 0, 7)
+    }
+  } else {
+    cyl(t, 0.18 * scale, 0.26 * scale, 2.2 * scale, make(0xe9e2d0), 0, 0, 0, 6)
+    place(crown, icoG(0.95 * scale), birchLeaf, 0, 2.7 * scale, 0)
+    place(crown, icoG(0.65 * scale), leavesLight, -0.4 * scale, 3.2 * scale, 0.2 * scale)
+  }
+  const seed = x * 0.37 + z * 0.21
+  ctx.animate((_dt, time) => {
+    crown.rotation.z = Math.sin(time * 0.9 + seed) * 0.025
+    crown.rotation.x = Math.cos(time * 0.7 + seed) * 0.02
+  })
+  return t
 }
 
-function tower(parent: THREE.Object3D, x: number, z: number,
-  height: number, radius = 1.4, roof = blue) {
-  mesh(parent, new THREE.CylinderGeometry(radius * 0.88, radius, height, 8),
-    stone, x, height / 2, z)
-  mesh(parent, new THREE.ConeGeometry(radius * 1.35, 2.6, 8),
-    roof, x, height + 1.3, z)
-  mesh(parent, new THREE.CylinderGeometry(0.06, 0.06, 1.2, 6),
-    gold, x, height + 3.1, z)
-  box(parent, 0.9, 0.45, 0.08, gold, x + 0.45, height + 3.4, z)
-}
-
-function building(parent: THREE.Object3D, x: number, z: number,
-  width: number, depth: number, height: number, roof: THREE.Material) {
-  const g = new THREE.Group()
-  g.position.set(x, 0, z)
-  parent.add(g)
-  box(g, width, height, depth, stone)
-  const top = mesh(g, new THREE.ConeGeometry(Math.max(width, depth) * 0.78,
-    2.6, 4), roof, 0, height + 1.3, 0)
-  top.rotation.y = Math.PI / 4
-  box(g, 1.3, 2.2, 0.12, wood, 0, 1.1, depth / 2 + 0.08)
-  box(g, 0.65, 0.85, 0.1, darkBlue, -width * 0.28, height * 0.6, depth / 2 + 0.09)
-  box(g, 0.65, 0.85, 0.1, darkBlue, width * 0.28, height * 0.6, depth / 2 + 0.09)
-  return g
-}
-
-function tree(parent: THREE.Object3D, x: number, z: number, scale = 1) {
-  mesh(parent, new THREE.CylinderGeometry(0.25 * scale, 0.35 * scale,
-    1.7 * scale, 6), wood, x, 0.85 * scale, z)
-  mesh(parent, new THREE.IcosahedronGeometry(1.1 * scale, 0),
-    leaves, x, 2.2 * scale, z)
-  mesh(parent, new THREE.IcosahedronGeometry(0.85 * scale, 0),
-    grass, x + 0.4 * scale, 2.65 * scale, z)
-}
-
-function pavedPath(parent: THREE.Object3D, x: number, z: number,
-  w: number, d: number) {
-  box(parent, w, 0.08, d, pathMat, x, 0.035, z)
+function bush(parent: THREE.Object3D, x: number, z: number, s: number, flowery: boolean) {
+  const b = group(parent, x, 0, z)
+  place(b, icoG(0.6 * s), leaves, 0, 0.45 * s, 0, false).scale.set(1.2, 0.8, 1)
+  place(b, icoG(0.42 * s), leavesLight, 0.4 * s, 0.4 * s, 0.2 * s, false)
+  if (flowery) {
+    const pink = make(0xff8fb0)
+    for (let i = 0; i < 4; i++) place(b, icoG(0.08 * s), pink, (i - 1.5) * 0.28 * s, 0.75 * s, ((i % 2) - 0.5) * 0.4 * s, false)
+  }
 }
 
 export function createKingdomWorld(): KingdomWorldData {
-  const group = new THREE.Group()
-  group.visible = false
+  const root = new THREE.Group()
+  root.visible = false
   const colliders: WorldCollider[] = []
   const buildings: KingdomBuilding[] = []
   const radius = 43
 
-  // Floating island, with a broad playable surface.
-  mesh(group, new THREE.CylinderGeometry(45, 41, 3, 16),
-    grass, 0, -1.5, 0)
-  mesh(group, new THREE.CylinderGeometry(41, 29, 9, 16),
-    soil, 0, -7.5, 0)
-  mesh(group, new THREE.ConeGeometry(29, 17, 16),
-    soil, 0, -20.5, 0)
+  const rig = new NightRig()
+  const animators: Animator[] = []
+  const ctx: BuildContext = { rig, animate: fn => animators.push(fn) }
+  let time = 0
 
-  // Plaza and paths; entry is at the south end (positive Z).
-  mesh(group, new THREE.CylinderGeometry(11, 11, 0.12, 24),
-    pathMat, 0, 0.055, 0)
-  pavedPath(group, 0, 22, 5, 34)
-  pavedPath(group, 0, -20, 5, 30)
-  pavedPath(group, -18, 0, 24, 4)
-  pavedPath(group, 18, 0, 24, 4)
-  pavedPath(group, -19, -14, 4, 24)
-  pavedPath(group, 19, -14, 4, 24)
-  pavedPath(group, -19, 15, 4, 24)
-  pavedPath(group, 19, 15, 4, 24)
+  // ---------- მცურავი კუნძული ----------
+  place(root, cylG(45, 41, 3, 24), grass, 0, -1.5, 0)
+  place(root, cylG(41, 29, 9, 20), soil, 0, -7.5, 0)
+  // ქვედა კონუსი წვეროთი ქვემოთ (ორიგინალში წვერო ზემოთ იყო მიმართული)
+  place(root, coneG(29, 17, 20).clone().rotateX(Math.PI), soil, 0, -20.5, 0)
 
-  // Fountain with luminous blue crystal.
-  const water = new THREE.MeshStandardMaterial({
-    color: 0x3bc7f5, emissive: 0x137da8,
-    emissiveIntensity: 0.35, roughness: 0.22, metalness: 0.12,
+  const rockBands = [
+    { r: 40.2, y: -4.2, h: 1.2, m: soilDark },
+    { r: 36.0, y: -9.6, h: 1.0, m: soilDark },
+    { r: 31.4, y: -14.2, h: 0.9, m: soilDark },
+  ]
+  for (const b of rockBands) cyl(root, b.r, b.r - 0.8, b.h, b.m, 0, b.y, 0, 20, false)
+
+  // ქვედა ნაწილზე მანათობელი კრისტალები (ღამით ჩანს)
+  const under = rig.glowMaterial('underCrystal', 0x6fd6ff, 0x1a9ad6, 0.35, 2.6, 0.3)
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 + 0.2
+    const r = 27 + (i % 3) * 1.6
+    const c = place(root, octG(1), under, Math.cos(a) * r, -14 - (i % 4) * 1.2, Math.sin(a) * r, false)
+    c.scale.set(0.7, 2.2 + (i % 3) * 0.6, 0.7)
+    c.rotation.set(0.2 * Math.cos(a), a, 0.2 * Math.sin(a))
+    if (i % 3 === 0) rig.halo(root, Math.cos(a) * r, -14 - (i % 4) * 1.2, Math.sin(a) * r, 5, 0x6fd6ff, 0.7, 0.05)
+  }
+
+  // კიდეზე ქვები
+  for (let i = 0; i < 44; i++) {
+    const a = (i / 44) * Math.PI * 2
+    const r = 44 + ((i * 7) % 5) * 0.2
+    const rock = place(root, new THREE.DodecahedronGeometry(0.45 + ((i * 13) % 4) * 0.12, 0), rockMat,
+      Math.cos(a) * r, 0.1, Math.sin(a) * r, false)
+    rock.scale.set(1.3, 0.7, 1)
+    rock.rotation.y = a
+  }
+
+  // ბილიკები (შესასვლელი სამხრეთით, +Z)
+  place(root, cylG(11, 11, 0.12, 32), pathMat, 0, 0.055, 0, false)
+  pavedPath(root, 0, 22, 5, 34)
+  pavedPath(root, 0, -20, 5, 30)
+  pavedPath(root, -18, 0, 24, 4)
+  pavedPath(root, 18, 0, 24, 4)
+  pavedPath(root, -19, -14, 4, 24)
+  pavedPath(root, 19, -14, 4, 24)
+  pavedPath(root, -19, 15, 4, 24)
+  pavedPath(root, 19, 15, 4, 24)
+
+  // მოედნის ორნამენტი
+  for (const r of [6.6, 9.4]) {
+    const ring = place(root, torusG(r, 0.1, 4, 72), P.trim, 0, 0.1, 0, false)
+    ring.rotation.x = Math.PI / 2
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2 + Math.PI / 12
+    const spoke = block(root, 0.14, 0.03, 2.4, P.trim, Math.cos(a) * 8.0, 0.1, Math.sin(a) * 8.0, false)
+    spoke.rotation.y = -a + Math.PI / 2
+  }
+
+  // ---------- შადრევანი ----------
+  const water = rig.glowMaterial('water', 0x3bc7f5, 0x137da8, 0.35, 1.5, 0.22)
+  cyl(root, 4.1, 4.3, 0.75, P.trim, 0, 0, 0, 24)
+  const rim = place(root, torusG(4.15, 0.2, 5, 36), P.base, 0, 0.78, 0, false)
+  rim.rotation.x = Math.PI / 2
+  cyl(root, 3.55, 3.55, 0.08, water, 0, 0.8, 0, 24, false)
+  cyl(root, 1.0, 1.25, 1.35, P.stone, 0, 0.75, 0, 12)
+  cyl(root, 2.1, 2.3, 0.35, P.trim, 0, 1.75, 0, 16)
+  cyl(root, 1.75, 1.75, 0.06, water, 0, 2.08, 0, 16, false)
+  cyl(root, 0.42, 0.58, 1.1, P.stone, 0, 2.1, 0, 10)
+  const crystal = place(root, octG(1.15), water, 0, 4.0, 0)
+  crystal.scale.set(0.9, 1.3, 0.9)
+  rig.halo(root, 0, 4.0, 0, 9, 0x58c8ff, 0.9, 0.06)
+  rig.light(root, 0x58c8ff, 0.4, 11, 22, 0, 3.6, 0, 0.06)
+
+  // წყლის წვეთები: ტოტებიდან აუზში
+  const dropMat = rig.glowMaterial('drop', 0x9be4ff, 0x4dc0f0, 0.3, 1.4, 0.2)
+  const drops: { mesh: THREE.Mesh; dir: number; phase: number }[] = []
+  for (let d = 0; d < 6; d++) {
+    for (let k = 0; k < 6; k++) {
+      drops.push({ mesh: place(root, icoG(0.07), dropMat, 0, -5, 0, false), dir: (d / 6) * Math.PI * 2, phase: k / 6 })
+    }
+  }
+  ctx.animate((_dt, t) => {
+    crystal.rotation.y = t * 0.8
+    crystal.position.y = 4.0 + Math.sin(t * 1.2) * 0.2
+    for (const p of drops) {
+      const u = (t * 0.55 + p.phase) % 1
+      const rr = 0.5 + u * 2.6
+      p.mesh.position.set(Math.cos(p.dir) * rr, 2.15 + 1.9 * 4 * u * (1 - u) - 1.35 * u, Math.sin(p.dir) * rr)
+    }
   })
-  mesh(group, new THREE.CylinderGeometry(4.1, 4.3, 0.75, 20),
-    trim, 0, 0.42, 0)
-  mesh(group, new THREE.CylinderGeometry(3.55, 3.55, 0.08, 20),
-    water, 0, 0.84, 0)
-  mesh(group, new THREE.CylinderGeometry(1, 1.25, 1.35, 12),
-    stone, 0, 1.5, 0)
-  const crystal = mesh(group, new THREE.OctahedronGeometry(1.15, 0),
-    water, 0, 3.2, 0)
-  crystal.rotation.y = Math.PI / 4
   colliders.push({ type: 'circle', x: 0, z: 0, radius: 4.2, height: 3.5 })
 
   function register(id: KingdomBuildingId, name: string,
@@ -149,83 +202,50 @@ export function createKingdomWorld(): KingdomWorldData {
     })
   }
 
-  // Castle at the far end of the courtyard.
-  building(group, 0, -32, 13, 7, 8, blue)
-  tower(group, -8, -32, 11, 2.1)
-  tower(group, 8, -32, 11, 2.1)
-  tower(group, 0, -34, 13, 2.3)
-  colliders.push({ type: 'box', x: 0, z: -32,
-    halfWidth: 6.5, halfDepth: 3.5, height: 13 })
+  // ---------- შენობები ----------
+  buildCastle(ctx, root)
+  colliders.push({ type: 'box', x: 0, z: -32, halfWidth: 6.5, halfDepth: 3.5, height: 13 })
   colliders.push({ type: 'circle', x: -8, z: -32, radius: 2.1, height: 14 })
   colliders.push({ type: 'circle', x: 8, z: -32, radius: 2.1, height: 14 })
 
-  // Knowledge Tower — tall glowing tower.
-  tower(group, -29, -17, 11, 2.8)
-  mesh(group, new THREE.OctahedronGeometry(1.1, 0),
-    water, -29, 16, -17)
+  buildKnowledgeTower(ctx, root)
   register('knowledge', 'ცოდნის კოშკი', -29, -17, 5.6, 5.6, 11)
 
-  // Academy — twin-tower school.
-  building(group, -21, -21, 8, 7, 5.5, blue)
-  tower(group, -25, -23, 7, 1.3)
-  tower(group, -17, -23, 7, 1.3)
+  buildAcademy(ctx, root)
   register('academy', 'აკადემია', -21, -21, 8, 7, 7)
 
-  // Library — warm red roof and oversized book sign.
-  const red = material(0xc95743)
-  building(group, 23, -19, 9, 7, 5.2, red)
-  box(group, 2.2, 0.28, 1.4, gold, 23, 7.9, -19)
+  buildLibrary(ctx, root)
   register('library', 'ბიბლიოთეკა', 23, -19, 9, 7, 5.2)
 
-  // Market — open stalls with colorful canopies.
-  const market = new THREE.Group()
-  market.position.set(-23, 0, 19)
-  group.add(market)
-  for (let i = 0; i < 4; i++) {
-    const x = (i % 2) * 6 - 3
-    const z = Math.floor(i / 2) * 6 - 3
-    box(market, 3.7, 0.9, 2.8, wood, x, 0.55, z)
-    box(market, 4.3, 0.35, 3.4, i % 2 ? blue : red,
-      x, 3.2, z)
-    for (const dx of [-1.7, 1.7]) {
-      for (const dz of [-1.2, 1.2]) {
-        box(market, 0.12, 2.7, 0.12, wood,
-          x + dx, 1.8, z + dz)
-      }
-    }
-  }
-  buildings.push({ id: 'market', name: 'მაღაზია',
-    position: new THREE.Vector3(-23, 0, 25), interactionRadius: 3 })
+  buildMarket(ctx, root)
+  buildings.push({
+    id: 'market', name: 'მაღაზია',
+    position: new THREE.Vector3(-23, 0, 25), interactionRadius: 3,
+  })
   for (const x of [-26, -20]) {
     for (const z of [-3, 3]) {
-      colliders.push({ type: 'box', x, z: 19 + z,
-        halfWidth: 1.9, halfDepth: 1.5, height: 3.5 })
+      colliders.push({
+        type: 'box', x, z: 19 + z,
+        halfWidth: 1.9, halfDepth: 1.5, height: 3.5,
+      })
     }
   }
 
-  // Forge — chimney and glowing furnace.
-  building(group, 24, 19, 9, 7, 4.8, darkBlue)
-  box(group, 1.7, 6.5, 1.7, trim, 27, 6, 17)
-  const fire = new THREE.MeshStandardMaterial({
-    color: 0xff7d22, emissive: 0xff4d00, emissiveIntensity: 1.5,
-  })
-  box(group, 1.5, 1.1, 0.18, fire, 24, 1.3, 22.62)
+  buildForge(ctx, root)
   register('forge', 'სამჭედლო', 24, 19, 9, 7, 6)
 
-  // Treasury — fortified vault with golden ornament.
-  building(group, 30, -2, 7, 7, 5.7, gold)
-  mesh(group, new THREE.OctahedronGeometry(1.1, 0),
-    gold, 30, 8.6, -2)
+  buildTreasury(ctx, root)
   register('treasury', 'საგანძურის საცავი', 30, -2, 7, 7, 5.7)
 
-  // Entrance gate; an opening in the front of the courtyard.
-  tower(group, -5.5, 37, 5, 1.6)
-  tower(group, 5.5, 37, 5, 1.6)
-  box(group, 8, 1.4, 1.2, stone, 0, 6.3, 37)
+  // შესასვლელი კარიბჭე
+  buildGate(ctx, root)
   colliders.push({ type: 'circle', x: -5.5, z: 37, radius: 1.6, height: 8 })
   colliders.push({ type: 'circle', x: 5.5, z: 37, radius: 1.6, height: 8 })
+  // თაღის ქვის მხრები (გამავალი სივრცე — 4.8 სიგანის)
+  colliders.push({ type: 'box', x: -3.1, z: 37, halfWidth: 0.7, halfDepth: 0.7, height: 8 })
+  colliders.push({ type: 'box', x: 3.1, z: 37, halfWidth: 0.7, halfDepth: 0.7, height: 8 })
 
-  // Trees along the perimeter, away from main roads.
+  // ---------- ხეები და ბუჩქები ----------
   for (let i = 0; i < 28; i++) {
     const angle = (i / 28) * Math.PI * 2
     const r = 36 + (i % 3) * 1.4
@@ -234,18 +254,75 @@ export function createKingdomWorld(): KingdomWorldData {
     if (Math.abs(x) < 10 && (z > 28 || z < -28)) continue
     if (x < -26 && z > 9 && z < 28) continue
     if (x > 22 && z > 9 && z < 28) continue
-    tree(group, x, z, 0.75 + (i % 4) * 0.13)
+    tree(ctx, root, x, z, 0.75 + (i % 4) * 0.13, i % 3)
     colliders.push({ type: 'circle', x, z, radius: 0.4, height: 2 })
   }
+  for (let i = 0; i < 26; i++) {
+    const angle = (i / 26) * Math.PI * 2 + 0.12
+    const r = 33.2 + (i % 2) * 0.9
+    const x = Math.cos(angle) * r
+    const z = Math.sin(angle) * r
+    if (Math.abs(x) < 8 && (z > 26 || z < -26)) continue
+    if (x < -24 && z > 9 && z < 28) continue
+    if (x > 20 && z > 9 && z < 28) continue
+    bush(root, x, z, 0.8 + (i % 3) * 0.2, i % 3 === 0)
+  }
 
-  decorateKingdom(group)
+  // ---------- მცურავი პატარა კუნძულები ----------
+  const islets: [number, number, number, number][] = [
+    [-64, -4, -22, 1.0], [60, -9, 30, 0.85], [8, -12, -72, 1.1], [-42, -8, 56, 0.9],
+  ]
+  islets.forEach(([x, y, z, s], idx) => {
+    const g = group(root, x, y, z)
+    g.scale.set(s, s, s)
+    cyl(g, 3.4, 3.0, 0.9, grass, 0, -0.9, 0, 10)
+    cone(g, 3.0, 4.5, soil, 0, -5.4, 0, 10).rotation.x = Math.PI
+    if (idx % 2 === 0) {
+      tree(ctx, g, 0.4, 0, 0.8, idx % 3)
+    } else {
+      const c = place(g, octG(0.8), under, 0, 1.0, 0)
+      c.scale.set(0.8, 1.6, 0.8)
+      rig.halo(g, 0, 1.0, 0, 4.5, 0x6fd6ff, 0.7, 0.05)
+    }
+    const seed = idx * 1.7
+    ctx.animate((_dt, t) => {
+      g.position.y = y + Math.sin(t * 0.6 + seed) * 0.6
+    })
+  })
+
+  decorateKingdom(root, rig)
+
+  // წარმადობა: პატარა დეტალები ჩრდილს აღარ ქმნის
+  root.traverse((obj: THREE.Object3D) => {
+    const mesh = obj as THREE.Mesh
+    if (!mesh.isMesh || !mesh.castShadow) return
+    const geo = mesh.geometry
+    if (!geo.boundingBox) geo.computeBoundingBox()
+    const bb = geo.boundingBox
+    if (!bb) return
+    const size = Math.max(
+      (bb.max.x - bb.min.x) * mesh.scale.x,
+      (bb.max.y - bb.min.y) * mesh.scale.y,
+      (bb.max.z - bb.min.z) * mesh.scale.z,
+    )
+    if (size < 0.7) mesh.castShadow = false
+  })
 
   const animals = new KingdomAnimals(colliders, radius)
-  group.add(animals.group)
+  root.add(animals.group)
 
   return {
-    group, colliders, buildings, animals,
+    group: root, colliders, buildings, animals,
     spawn: new THREE.Vector3(0, 0, 33),
     radius,
+    update(dt: number) {
+      time += dt
+      for (const a of animators) a(dt, time)
+      rig.update(dt)
+    },
+    setNightLevel(level: number) {
+      rig.setLevel(level)
+    },
+    night: rig,
   }
 }

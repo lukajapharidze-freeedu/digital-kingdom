@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { NightRig } from './KingdomNight'
 
 const material = (color: number, emissive = 0) =>
   new THREE.MeshStandardMaterial({
@@ -44,15 +45,18 @@ function flower(parent: THREE.Group, x: number, z: number, color: THREE.Material
     green, x + 0.1, 0.2, z)
 }
 
-function lantern(parent: THREE.Group, x: number, z: number) {
+function lantern(parent: THREE.Group, x: number, z: number, rig: NightRig) {
+  // ღამით ფარნის შუშა ანათებს და ირგვლივ რბილი ნათება ჩნდება
+  const glow = rig.glowMaterial('lantern', 0xffdc83, 0xffba48, 0.35, 2.6, 0.4)
   addMesh(parent, new THREE.CylinderGeometry(0.12, 0.18, 3.2, 7),
     iron, x, 1.6, z)
   addMesh(parent, new THREE.BoxGeometry(0.8, 0.85, 0.8),
     iron, x, 3.45, z)
   addMesh(parent, new THREE.BoxGeometry(0.59, 0.6, 0.59),
-    warmLight, x, 3.45, z)
+    glow, x, 3.45, z)
   addMesh(parent, new THREE.ConeGeometry(0.62, 0.55, 4),
     iron, x, 4.15, z).rotation.y = Math.PI / 4
+  rig.halo(parent, x, 3.45, z, 3.4, 0xffc766, 0.85, 0)
 }
 
 function bench(parent: THREE.Group, x: number, z: number, rotation = 0) {
@@ -113,15 +117,15 @@ function flag(parent: THREE.Group, x: number, z: number, color: number) {
     warmLight, x, 5.1, z)
 }
 
-export function decorateKingdom(parent: THREE.Group) {
+export function decorateKingdom(parent: THREE.Group, rig: NightRig) {
   // The entrance avenue stays clear for the player.
   for (const z of [8, 16, 24, 31]) {
-    lantern(parent, -4.3, z)
-    lantern(parent, 4.3, z)
+    lantern(parent, -4.3, z, rig)
+    lantern(parent, 4.3, z, rig)
   }
   for (const z of [-9, -17, -25]) {
-    lantern(parent, -4.3, z)
-    lantern(parent, 4.3, z)
+    lantern(parent, -4.3, z, rig)
+    lantern(parent, 4.3, z, rig)
   }
 
   for (const [x, z, rotation] of [
