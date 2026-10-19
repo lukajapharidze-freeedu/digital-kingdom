@@ -1,4 +1,3 @@
-
 import * as THREE from 'three'
 
 import {
@@ -16,6 +15,7 @@ import { CollisionSystem } from './Collision'
 import { Player } from './Player'
 import { GameCamera } from './Camera'
 import { CPUDash } from '../minigames/CPUDash'
+import { TypingGrandmaster } from '../minigames/TypingGrandmaster'
 
 import {
   createKingdomWorld,
@@ -55,8 +55,12 @@ export class Game {
 
   private forgeIntroOverlay: HTMLDivElement | null = null
   private forgeGamesOverlay: HTMLDivElement | null = null
+
   private cpuDashActive = false
   private cpuDash: CPUDash | null = null
+
+  private typingGrandmasterActive = false
+  private typingGrandmaster: TypingGrandmaster | null = null
 
   private currentWorld: WorldName = 'island'
   private grade: Grade
@@ -236,7 +240,8 @@ export class Game {
       this.paused ||
       this.changingGrade ||
       this.isForgeModalOpen() ||
-      this.cpuDashActive
+      this.cpuDashActive ||
+      this.typingGrandmasterActive
     ) {
       this.currentInteraction = null
       this.interactionPrompt.style.display = 'none'
@@ -256,7 +261,6 @@ export class Game {
         let nearestDistance = Infinity
 
         for (const building of this.kingdom.buildings) {
-          // სამჭედლოს სპეციალური ფუნქცია მხოლოდ IV კლასისთვისაა.
           if (building.id === 'forge' && this.grade !== 4) {
             continue
           }
@@ -505,10 +509,11 @@ export class Game {
       const name = document.createElement('span')
       name.textContent = MINI_GAMES[i]
 
+      const isPlayable = i === 0 || i === 5
       const status = document.createElement('small')
-      status.textContent = i === 0 ? '▶ თამაში' : 'მალე დაემატება'
+      status.textContent = isPlayable ? '▶ თამაში' : 'მალე დაემატება'
       status.style.cssText = `
-        color: ${i === 0 ? '#18834a' : '#718197'};
+        color: ${isPlayable ? '#18834a' : '#718197'};
         font-size: 11px;
         font-weight: normal;
       `
@@ -516,14 +521,20 @@ export class Game {
       details.append(name, status)
       item.append(gameIcon, details)
 
-      if (i === 0) {
+      if (isPlayable) {
         item.style.cursor = 'pointer'
         item.style.border = '2px solid #38a169'
         item.style.background = 'linear-gradient(135deg, #f0fff4, #ffffff)'
         item.setAttribute('role', 'button')
         item.tabIndex = 0
-        item.setAttribute('aria-label', 'CPU Dash თამაშის დაწყება')
-        item.addEventListener('click', () => this.startCPUDash())
+        item.setAttribute('aria-label', `${MINI_GAMES[i]} თამაშის დაწყება`)
+
+        const startGameHandler = () => {
+          if (i === 0) this.startCPUDash()
+          if (i === 5) this.startTypingGrandmaster()
+        }
+
+        item.addEventListener('click', startGameHandler)
         item.addEventListener('mouseenter', () => {
           item.style.transform = 'translateY(-2px)'
           item.style.boxShadow = '0 8px 18px rgba(25, 120, 70, 0.18)'
@@ -535,7 +546,7 @@ export class Game {
         item.addEventListener('keydown', event => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            this.startCPUDash()
+            startGameHandler()
           }
         })
       } else {
@@ -590,6 +601,32 @@ export class Game {
         this.cpuDashActive = false
         this.clock.getDelta()
         this.updateInteractions()
+      },
+    })
+  }
+
+  private startTypingGrandmaster() {
+    if (this.grade !== 4 || this.typingGrandmasterActive) return
+
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
+    this.forgeIntroOverlay?.remove()
+    this.forgeIntroOverlay = null
+
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+    this.typingGrandmasterActive = true
+    this.clock.getDelta()
+
+    this.typingGrandmaster = new TypingGrandmaster({
+      onClose: () => {
+        this.typingGrandmaster = null
+        this.typingGrandmasterActive = false
+        this.clock.getDelta()
+        this.updateInteractions()
+      },
+      onSuccess: (stats) => {
+        console.log('Typing Grandmaster completed:', stats)
       },
     })
   }
@@ -649,9 +686,8 @@ export class Game {
 
   private onKeyDown = (event: KeyboardEvent) => {
     if (this.changingGrade) return
-    if (this.cpuDashActive) return
+    if (this.cpuDashActive || this.typingGrandmasterActive) return
 
-    // სამჭედლოს ფანჯრებში Escape პაუზას არ ხსნის.
     if (event.code === 'Escape' && this.isForgeModalOpen()) {
       event.preventDefault()
       event.stopPropagation()
@@ -659,7 +695,6 @@ export class Game {
       return
     }
 
-    // Enter ადასტურებს თანხმობას და აჩვენებს თამაშების სიას.
     if (
       event.code === 'Enter' &&
       this.forgeIntroOverlay !== null
@@ -670,7 +705,6 @@ export class Game {
       return
     }
 
-    // სამჭედლოს ფანჯრის დროს სხვა თამაშის მართვის ღილაკები იგნორირდება.
     if (this.isForgeModalOpen()) return
 
     if (event.code === 'Escape') {
@@ -814,7 +848,7 @@ export class Game {
 
     const modalOpen = this.isForgeModalOpen()
 
-    if (!this.paused && !this.changingGrade && !modalOpen && !this.cpuDashActive) {
+    if (!this.paused && !this.changingGrade && !modalOpen && !this.cpuDashActive && !this.typingGrandmasterActive) {
       this.player.update(
         delta,
         this.gameCamera.yaw
