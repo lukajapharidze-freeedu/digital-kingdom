@@ -1,10 +1,24 @@
+export type CPUDashQuestion = {
+  prompt: string
+  answers: string[]
+  anyOf?: boolean
+  /** მინიშნება, რომელიც პასუხის შეცდომისას ჩანს */
+  hint?: string
+  /** საკუთარი შემოწმება (მაგ. აკადემიის იგივე წესებით); თუ არის, answers-ზე უპირატესია */
+  check?: (input: string) => boolean
+}
+
 export type CPUDashOptions = {
   onClose?: () => void
+  /** თუ გადაეცემა, ბანკის მაგივრად ეს კითხვები გამოიყენება (ბიბლიოთეკა/აკადემიის კითხვები) */
+  questions?: CPUDashQuestion[]
 }
 
 type Question = {
   prompt: string
   answers: string[]
+  hint?: string
+  check?: (input: string) => boolean
   // true — მიიღება ჩამოთვლილი პასუხებიდან ნებისმიერი (ან რამდენიმე მათგანი ერთად)
   anyOf?: boolean
 }
@@ -21,6 +35,7 @@ type ObstacleKind =
   | 'drone'
   | 'saw'
   | 'drop'
+  | 'pit'
 
 type Obstacle = {
   x: number
@@ -37,6 +52,23 @@ type Obstacle = {
   dropY?: number // ჩამოვარდნილი ბლოკი: რამდენით არის ზემოთ საბოლოო ადგილიდან
   triggerX?: number // სად დაიწყოს ბლოკმა ვარდნა
   impact?: boolean
+}
+
+// რაკეტის ეტაპის დაბრკოლებები (კოორდინატები გვირაბის ცენტრის მიმართ)
+type RocketObstacle = {
+  kind: 'gate' | 'spike' | 'hole'
+  /** სამყაროს x (მარცხენა კიდე; ხვრელისთვის — ცენტრი) */
+  wx: number
+  width: number
+  gapOffset?: number // gate: ხვრელის ცენტრი გვირაბის ცენტრიდან
+  gapH?: number // gate: ხვრელის სიმაღლე
+  height?: number // spike
+  fromTop?: boolean // spike: ჭერიდან ეშვება თუ იატაკიდან ადის
+  r?: number // hole: რადიუსი
+  offset?: number // hole: ცენტრის გადახრა გვირაბის ცენტრიდან
+  /** სად უნდა გაიაროს რაკეტამ (გვირაბის ცენტრიდან გადახრა) — გამოიყენება დაშორებისთვის და ტესტებში */
+  passY: number
+  passed?: boolean
 }
 
 type Meteor = {
@@ -59,6 +91,8 @@ type ChunkKind =
   | 'drone'
   | 'drop'
   | 'saw'
+  | 'pit'
+  | 'pitBridge'
 
 type Features = {
   superBridge: number // სუპერ-ხტომის პლატფორმა
@@ -72,6 +106,8 @@ type Features = {
   saw: number // მოძრავი ხერხი
   double: number // ორმაგი ეკალი
   triple: number // სამმაგი ეკალი
+  pit: number // ორმო მიწაზე: ჩავარდნა = წაგება
+  pitBridge: number // ფართო ორმო ხიდით
 }
 
 type LevelConfig = {
@@ -84,6 +120,8 @@ type LevelConfig = {
   background: string
   accent: string
   theme: Theme
+  /** 'rocket' — გმირი რაკეტაზეა და კედლებს შორის დაფრინავს */
+  mode?: 'run' | 'rocket'
   sky: [string, string, string]
   tip: string
   features: Features
@@ -130,7 +168,28 @@ const QUESTION_BANK: Question[] = [
 ]
 
 // ერთი ეტაპის სიგრძე მეტრებში
-const LEVEL_LENGTH = 2000
+// ეტაპის სიგრძე მეტრებში: პირველი 2000 მ, ყოველ შემდეგს +150 მ; მე-9 ეტაპის შემდეგ აღარ იზრდება
+const LEVEL_LENGTH_BASE = 2000
+const LEVEL_LENGTH_STEP = 150
+const LEVEL_LENGTH_MAX_STAGE = 9
+
+function levelLengthFor(levelIndex: number): number {
+  const stage = Math.min(levelIndex + 1, LEVEL_LENGTH_MAX_STAGE)
+  return LEVEL_LENGTH_BASE + (stage - 1) * LEVEL_LENGTH_STEP
+}
+// ვიზუალური მასშტაბი: გმირი და დაბრკოლებები უფრო დიდად ჩანს (თამაშის სიჩქარე და მანძილები არ იცვლება)
+const ZOOM = 1.3
+const TAU = Math.PI * 2
+
+// რაკეტის ეტაპი (მე-7): ფიზიკა და ზომები
+const ROCKET = {
+  climb: 260, // ასვლის სიჩქარე, როცა ღილაკი დაჭერილია
+  fall: 240, // ჩასვლის სიჩქარე, როცა ღილაკი გაშვებულია
+  response: 8, // რამდენად სწრაფად ცვლის გმირი სიჩქარეს (მეტი = უფრო მკვეთრი მართვა)
+  top: 41, // რაკეტის ცენტრიდან ზევით (გმირითურთ)
+  bottom: 17, // ცენტრიდან ქვევით (ფრთებით)
+  width: 58,
+}
 
 // რთული ნაკრებების წინ დამატებითი დრო (წამებში) — წინა დაბრკოლების გადალახვის შემდეგ მოსამზადებლად
 const CHUNK_LEAD: Partial<Record<ChunkKind, number>> = {
@@ -139,6 +198,8 @@ const CHUNK_LEAD: Partial<Record<ChunkKind, number>> = {
   saw: 0.25,
   drone: 0.12,
   triple: 0.08,
+  pit: 0.15,
+  pitBridge: 0.2,
 }
 const DROP_SPEED = 1500
 
@@ -154,12 +215,14 @@ const NO_FEATURES: Features = {
   saw: 0,
   double: 0,
   triple: 0,
+  pit: 0,
+  pitBridge: 0,
 }
 
 const LEVELS: LevelConfig[] = [
   {
     name: 'ეტაპი 1 — ჩიპის ველი',
-    speed: 350,
+    speed: 380,
     gapMin: 280,
     gapMax: 410,
     obstacleChance: 0.72,
@@ -173,7 +236,7 @@ const LEVELS: LevelConfig[] = [
   },
   {
     name: 'ეტაპი 2 — მონაცემთა ნაკადი',
-    speed: 415,
+    speed: 450,
     gapMin: 270,
     gapMax: 390,
     obstacleChance: 0.78,
@@ -187,7 +250,7 @@ const LEVELS: LevelConfig[] = [
   },
   {
     name: 'ეტაპი 3 — პროცესორის ბირთვი',
-    speed: 500,
+    speed: 540,
     gapMin: 270,
     gapMax: 390,
     obstacleChance: 0.88,
@@ -197,11 +260,11 @@ const LEVELS: LevelConfig[] = [
     theme: 'core',
     sky: ['#2b0a12', '#080816', '#02040a'],
     tip: '',
-    features: { ...NO_FEATURES, superBridge: 0.22, bridge: 0.22, bridgeHazard: true, double: 0.25 },
+    features: { ...NO_FEATURES, superBridge: 0.22, bridge: 0.22, bridgeHazard: true, double: 0.25, pit: 0.12 },
   },
   {
     name: 'ეტაპი 4 — ქსელის ქალაქი',
-    speed: 540,
+    speed: 575,
     gapMin: 250,
     gapMax: 360,
     obstacleChance: 0.9,
@@ -220,11 +283,13 @@ const LEVELS: LevelConfig[] = [
       drone: 0.12,
       droneCombo: 0.5,
       double: 0.3,
+      pit: 0.12,
+      pitBridge: 0.06,
     },
   },
   {
     name: 'ეტაპი 5 — ვირუსის ზონა',
-    speed: 575,
+    speed: 605,
     gapMin: 245,
     gapMax: 350,
     obstacleChance: 0.92,
@@ -245,11 +310,13 @@ const LEVELS: LevelConfig[] = [
       drop: 0.1,
       double: 0.3,
       triple: 0.12,
+      pit: 0.1,
+      pitBridge: 0.1,
     },
   },
   {
     name: 'ეტაპი 6 — მეხსიერების ოკეანე',
-    speed: 610,
+    speed: 635,
     gapMin: 245,
     gapMax: 345,
     obstacleChance: 0.93,
@@ -272,20 +339,23 @@ const LEVELS: LevelConfig[] = [
       saw: 0.1,
       double: 0.32,
       triple: 0.15,
+      pit: 0.08,
+      pitBridge: 0.12,
     },
   },
   {
-    name: 'ეტაპი 7 — კვანტური გვირაბი',
-    speed: 645,
-    gapMin: 240,
-    gapMax: 335,
+    name: 'ეტაპი 7 — რაკეტა კვანტურ გვირაბში',
+    speed: 665,
+    gapMin: 245,
+    gapMax: 340,
     obstacleChance: 0.94,
     color: '#b06bff',
     background: '#12062e',
     accent: '#ff6bd6',
     theme: 'tunnel',
+    mode: 'rocket',
     sky: ['#12062e', '#0a0420', '#02010a'],
-    tip: 'ტემპი იზრდება — დაბრკოლებები ერთმანეთს უფრო მალე მოჰყვება',
+    tip: 'ახალი: რაკეტა! დაჭერა — ზემოთ, გაშვება — ქვემოთ. გაძვერი ხვრელებში, მოერიდე ეკლებს და შავ ხვრელებს, კედლებს არ შეეხო!',
     features: {
       ...NO_FEATURES,
       superBridge: 0.1,
@@ -299,13 +369,15 @@ const LEVELS: LevelConfig[] = [
       saw: 0.11,
       double: 0.33,
       triple: 0.17,
+      pit: 0.08,
+      pitBridge: 0.12,
     },
   },
   {
     name: 'ეტაპი 8 — სერვერების ბნელი ოთახი',
-    speed: 680,
-    gapMin: 240,
-    gapMax: 330,
+    speed: 695,
+    gapMin: 250,
+    gapMax: 340,
     obstacleChance: 0.95,
     color: '#ffd34f',
     background: '#1d1405',
@@ -326,13 +398,15 @@ const LEVELS: LevelConfig[] = [
       saw: 0.12,
       double: 0.35,
       triple: 0.18,
+      pit: 0.08,
+      pitBridge: 0.14,
     },
   },
   {
     name: 'ეტაპი 9 — ციფრული ქარიშხალი',
-    speed: 720,
-    gapMin: 235,
-    gapMax: 325,
+    speed: 730,
+    gapMin: 262,
+    gapMax: 345,
     obstacleChance: 0.96,
     color: '#7df9ff',
     background: '#0b0b1f',
@@ -353,6 +427,8 @@ const LEVELS: LevelConfig[] = [
       saw: 0.13,
       double: 0.36,
       triple: 0.2,
+      pit: 0.08,
+      pitBridge: 0.16,
     },
   },
 ]
@@ -406,9 +482,22 @@ export class CPUDash {
   private velocityY = 0
   private grounded = true
   private jumpQueued = false
+  private jumpHeld = false
+  private flipAngle = 0
+  private flipRate = 0
+  private rocketY = 0
+  private rocketVY = 0
+  private rocketGrace = 0
+  private levelTime = 0
+  private rocketObs: RocketObstacle[] = []
+  private nextRocketWx = 0
+  private lastRocketPass = 0
   private questionOpen = false
   private lastQuestion = -1
   private currentQuestionIndex = -1
+  private readonly bank: Question[]
+  private fallingIntoPit = false
+  private fallTimer = 0
   private readonly answeredQuestionIndices = new Set<number>()
   private flash = 0
   private levelIntroUntil = 0
@@ -445,8 +534,20 @@ export class CPUDash {
       event.preventDefault()
       if (!this.questionOpen && this.running) {
         this.jumpQueued = true
+        this.jumpHeld = true
       }
     }
+  }
+
+  // ღილაკის გაშვება: გმირი ხტომას წყვეტს (დაჭერილ ღილაკზე განუწყვეტლად ხტება)
+  private readonly keyUpHandler = (event: KeyboardEvent) => {
+    if (event.code === 'Space' || event.code === 'ArrowUp' || event.code === 'KeyW') {
+      this.jumpHeld = false
+    }
+  }
+
+  private readonly releaseHandler = () => {
+    this.jumpHeld = false
   }
 
   private readonly pointerHandler = (event: PointerEvent) => {
@@ -455,10 +556,12 @@ export class CPUDash {
 
     if (!this.questionOpen && this.running) {
       this.jumpQueued = true
+      this.jumpHeld = true
     }
   }
 
   constructor(options: CPUDashOptions = {}) {
+    this.bank = options.questions && options.questions.length > 0 ? options.questions : QUESTION_BANK
     this.onClose = options.onClose
     this.createInterface()
     this.initMeteors()
@@ -471,8 +574,8 @@ export class CPUDash {
     this.meteors = []
     for (let i = 0; i < 12; i++) {
       this.meteors.push({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * (window.innerHeight * 0.6),
+        x: Math.random() * this.viewW(),
+        y: Math.random() * (this.viewH() * 0.6),
         length: 40 + Math.random() * 80,
         speed: 400 + Math.random() * 500,
         alpha: 0.3 + Math.random() * 0.6,
@@ -782,6 +885,10 @@ export class CPUDash {
 
     this.root.addEventListener('pointerdown', this.pointerHandler)
     window.addEventListener('keydown', this.keyHandler, true)
+    window.addEventListener('keyup', this.keyUpHandler, true)
+    window.addEventListener('pointerup', this.releaseHandler)
+    window.addEventListener('pointercancel', this.releaseHandler)
+    window.addEventListener('blur', this.releaseHandler)
     window.addEventListener('resize', this.resizeHandler)
 
     this.resize()
@@ -825,11 +932,25 @@ export class CPUDash {
     this.flash = 0
     this.shake = 0
     this.finishSpawned = false
+    this.fallingIntoPit = false
+    this.fallTimer = 0
+    this.levelTime = 0
+    this.flipAngle = 0
 
     const level = LEVELS[this.levelIndex]
     const speedRatio = level.speed / LEVELS[0].speed
     this.currentGravity = 1900 * speedRatio
     this.currentJumpPower = 690 * Math.sqrt(speedRatio)
+    // ერთი სრული ფლიპი ერთ ჩვეულებრივ ხტომაზე
+    this.flipRate = TAU / ((2 * this.currentJumpPower) / this.currentGravity)
+
+    // რაკეტა იწყებს ეკრანის შუაში
+    this.rocketY = this.viewH() * 0.5
+    this.rocketVY = 0
+    this.rocketGrace = 1.4
+    this.rocketObs = []
+    this.nextRocketWx = 1500
+    this.lastRocketPass = this.viewH() * 0.5
 
     this.nextObstacleX = this.playerX() + (200 / 0.18)
     this.updateHUD()
@@ -858,11 +979,12 @@ export class CPUDash {
     const level = LEVELS[this.levelIndex]
     this.root.querySelector('.cpu-level')!.textContent = level.name
 
-    const shown = Math.min(Math.floor(this.distance), LEVEL_LENGTH)
+    const length = levelLengthFor(this.levelIndex)
+    const shown = Math.min(Math.floor(this.distance), length)
     const label = this.root.querySelector('.cpu-progress-label')!
-    label.textContent = `ეტაპი ${this.levelIndex + 1}/${LEVELS.length} · ${shown} მ / ${LEVEL_LENGTH} მ`
+    label.textContent = `ეტაპი ${this.levelIndex + 1}/${LEVELS.length} · ${shown} მ / ${length} მ`
 
-    const progress = Math.min(this.distance / LEVEL_LENGTH, 1) * 100
+    const progress = Math.min(this.distance / length, 1) * 100
     ;(this.root.querySelector('.cpu-progress > div') as HTMLDivElement)
       .style.width = `${progress}%`
   }
@@ -897,21 +1019,33 @@ export class CPUDash {
       meteor.x -= meteor.speed * delta
       meteor.y += meteor.speed * 0.45 * delta
       if (meteor.x < -100 || meteor.y > ground) {
-        meteor.x = window.innerWidth + Math.random() * 200
-        meteor.y = Math.random() * (window.innerHeight * 0.5)
+        meteor.x = this.viewW() + Math.random() * 200
+        meteor.y = Math.random() * (this.viewH() * 0.5)
       }
     }
   }
 
-  // ფინიშის გამოჩენის მომენტი ისე, რომ მოთამაშე ფინიშს ზუსტად LEVEL_LENGTH მეტრზე შეხვდეს
+  // ფინიშის გამოჩენის მომენტი ისე, რომ მოთამაშე ფინიშს ზუსტად ეტაპის სიგრძეზე შეხვდეს
   private finishSpawnDistance() {
-    const travel = window.innerWidth + 180 - (this.playerX() + this.playerSize / 2)
-    return LEVEL_LENGTH - travel * 0.18
+    const travel = this.viewW() + 180 - (this.playerX() + this.playerSize / 2)
+    return levelLengthFor(this.levelIndex) - travel * 0.18
   }
 
   private update(delta: number) {
     const level = LEVELS[this.levelIndex]
     const ground = this.groundY()
+
+    // ორმოში ჩავარდნა: გმირი ძირს ეშვება, შემდეგ წაგება
+    if (this.fallingIntoPit) {
+      this.velocityY += this.currentGravity * delta
+      this.playerY += this.velocityY * delta
+      this.fallTimer -= delta
+      if (this.fallTimer <= 0) {
+        this.fallingIntoPit = false
+        this.fail()
+      }
+      return
+    }
 
     this.distance += level.speed * delta * 0.18
     this.scroll += level.speed * delta
@@ -919,14 +1053,19 @@ export class CPUDash {
     if (!this.finishSpawned && this.distance >= this.finishSpawnDistance()) {
       this.finishSpawned = true
       this.obstacles.push({
-        x: window.innerWidth + 180,
+        x: this.viewW() + 180,
         width: 60,
         height: 180,
         kind: 'finish',
       })
     }
 
-    if (this.jumpQueued && this.grounded) {
+    if (level.mode === 'rocket') {
+      this.updateRocket(delta, level)
+      return
+    }
+
+    if ((this.jumpQueued || this.jumpHeld) && this.grounded) {
       this.velocityY = -this.currentJumpPower
       this.grounded = false
     }
@@ -939,6 +1078,15 @@ export class CPUDash {
       this.playerY = 0
       this.velocityY = 0
       this.grounded = true
+    }
+
+    // ფრონტ ფლიპი: პირდაპირ ჰაერში ბრუნავს, დაშვებისას ბრუნვა ნელ-ნელა დგება
+    if (!this.grounded) {
+      this.flipAngle += this.flipRate * delta
+    } else if (this.flipAngle !== 0) {
+      const target = Math.round(this.flipAngle / TAU) * TAU
+      this.flipAngle += (target - this.flipAngle) * Math.min(1, 18 * delta)
+      if (Math.abs(target - this.flipAngle) < 0.02) this.flipAngle = 0
     }
 
     const playerX = this.playerX()
@@ -959,7 +1107,7 @@ export class CPUDash {
     if (
       !this.finishSpawned &&
       this.distance < this.finishSpawnDistance() - 100 &&
-      this.nextObstacleX < window.innerWidth + 80
+      this.nextObstacleX < this.viewW() + 80
     ) {
       this.spawnObstacle()
     }
@@ -994,6 +1142,23 @@ export class CPUDash {
 
       const ox1 = obstacle.x
       const ox2 = obstacle.x + obstacle.width
+
+      if (obstacle.kind === 'pit') {
+        // ჩავარდნა: გმირის ცენტრი ორმოს თავზე და ის მიწის დონეზე (არ ხტება)
+        const center = playerX + this.playerSize / 2
+        if (this.playerY >= -1 && center > ox1 + 8 && center < ox2 - 8) {
+          this.fallingIntoPit = true
+          this.fallTimer = 0.4
+          this.velocityY = 150
+          this.shake = 0.12
+          return
+        }
+        if (!obstacle.passed && ox2 < playerX) {
+          obstacle.passed = true
+          this.score++
+        }
+        continue
+      }
 
       if (obstacle.kind === 'bridge' || obstacle.kind === 'super_bridge') {
         const platformTop = ground - obstacle.height
@@ -1047,6 +1212,228 @@ export class CPUDash {
     this.updateHUD()
   }
 
+  // ---------- რაკეტის ეტაპი ----------
+
+  /** გვირაბი: ჭერისა და იატაკის სიმაღლე მოცემულ სამყაროს x-ზე. თავიდან ფართოა, ბოლოსკენ ვიწროვდება. */
+  private corridor(worldX: number): { top: number; bottom: number } {
+    const H = this.viewH()
+    const t = Math.min(1, Math.max(0, worldX / 1400))
+    const ramp = t * t * (3 - 2 * t)
+    const center =
+      H * 0.5 +
+      ramp * (H * 0.1 * Math.sin(worldX * 0.0021) + H * 0.04 * Math.sin(worldX * 0.0047 + 1.3))
+    const p = Math.min(1, Math.max(0, worldX / (levelLengthFor(this.levelIndex) / 0.18)))
+    const half = Math.max(115, H * (0.33 - 0.09 * p))
+    return {
+      top: center - half + Math.sin(worldX * 0.031) * 5,
+      bottom: center + half + Math.sin(worldX * 0.027 + 2) * 5,
+    }
+  }
+
+  private updateRocket(delta: number, level: LevelConfig) {
+    this.levelTime += delta
+    const playerX = this.playerX()
+
+    for (const obstacle of this.obstacles) {
+      obstacle.x -= level.speed * delta
+      if (obstacle.kind === 'finish' && obstacle.x <= playerX + this.playerSize / 2) {
+        this.finishLevel()
+        return
+      }
+    }
+
+    // დაჭერა = ზემოთ, გაშვება = ქვემოთ (დასაწყისში მცირე ხნით ჰაერში ჩერდება)
+    let targetV = this.jumpHeld ? -ROCKET.climb : ROCKET.fall
+    if (this.rocketGrace > 0) {
+      if (this.jumpHeld) {
+        this.rocketGrace = 0
+      } else {
+        this.rocketGrace -= delta
+        targetV = 0
+        this.rocketVY = 0
+      }
+    }
+    this.rocketVY += (targetV - this.rocketVY) * Math.min(1, ROCKET.response * delta)
+    this.rocketY += this.rocketVY * delta
+
+    // შეჯახება ჭერთან ან იატაკთან (წინა, შუა და უკანა წერტილში)
+    for (const dx of [4, ROCKET.width / 2, ROCKET.width - 4]) {
+      const c = this.corridor(this.scroll + playerX + dx)
+      if (this.rocketY - ROCKET.top < c.top || this.rocketY + ROCKET.bottom > c.bottom) {
+        this.fail()
+        return
+      }
+    }
+
+    // ახალი დაბრკოლებები (ფინიშთან ახლოს აღარ)
+    const totalPx = levelLengthFor(this.levelIndex) / 0.18
+    while (
+      this.nextRocketWx < this.scroll + this.viewW() + 140 &&
+      this.nextRocketWx < totalPx - 1100
+    ) {
+      this.spawnRocketObstacle(level, totalPx)
+    }
+
+    if (this.rocketObstacleHit(playerX)) {
+      this.fail()
+      return
+    }
+
+    for (const o of this.rocketObs) {
+      if (!o.passed && o.wx - this.scroll + o.width < playerX) {
+        o.passed = true
+        this.score++
+      }
+    }
+    this.rocketObs = this.rocketObs.filter(o => o.wx - this.scroll + o.width > -160)
+
+    this.updateHUD()
+  }
+
+  /** რაკეტის შეჯახების მართკუთხედი (გმირითურთ, მცირე დათმობით) */
+  private rocketRect(playerX: number) {
+    return {
+      x0: playerX + 6,
+      x1: playerX + ROCKET.width - 4,
+      y0: this.rocketY - ROCKET.top + 5,
+      y1: this.rocketY + ROCKET.bottom - 3,
+    }
+  }
+
+  private rocketObstacleHit(playerX: number): boolean {
+    const r = this.rocketRect(playerX)
+
+    for (const o of this.rocketObs) {
+      const sx = o.wx - this.scroll
+      if (sx > r.x1 + 4 || sx + o.width < r.x0 - 4) continue
+
+      if (o.kind === 'gate') {
+        if (sx > r.x1 || sx + o.width < r.x0) continue
+        const c = this.corridor(o.wx)
+        const gapCenter = (c.top + c.bottom) / 2 + (o.gapOffset ?? 0)
+        const half = (o.gapH ?? 150) / 2
+        if (r.y0 < gapCenter - half || r.y1 > gapCenter + half) return true
+      } else if (o.kind === 'spike') {
+        const h = o.height ?? 80
+        const cx = sx + o.width / 2
+        const c = this.corridor(o.wx + o.width / 2)
+        let depth: number
+        if (o.fromTop) {
+          if (r.y0 >= c.top + h) continue
+          depth = Math.max(r.y0, c.top) - c.top
+        } else {
+          if (r.y1 <= c.bottom - h) continue
+          depth = c.bottom - Math.min(r.y1, c.bottom)
+        }
+        const halfW = (o.width / 2) * (1 - depth / h)
+        if (r.x1 > cx - halfW && r.x0 < cx + halfW) return true
+      } else {
+        const hr = o.r ?? 38
+        const hx = sx + hr
+        const c = this.corridor(o.wx + hr)
+        const cy = (c.top + c.bottom) / 2 + (o.offset ?? 0)
+        const radius = hr * 0.82
+        const nx = Math.max(r.x0, Math.min(hx, r.x1))
+        const ny = Math.max(r.y0, Math.min(cy, r.y1))
+        if (Math.hypot(nx - hx, ny - cy) < radius) return true
+      }
+    }
+    return false
+  }
+
+  /** ახალი დაბრკოლება: გასაძრომი (ჭიშკარი), ეკლები ჭერიდან/იატაკიდან ან შავი ხვრელი შუაში */
+  private spawnRocketObstacle(level: LevelConfig, totalPx: number) {
+    const wx = this.nextRocketWx
+    const c = this.corridor(wx)
+    const center = (c.top + c.bottom) / 2
+    const gap = c.bottom - c.top
+    const need = ROCKET.top + ROCKET.bottom
+    const p = Math.min(1, wx / totalPx)
+    const roll = Math.random()
+    let obstacle: RocketObstacle | null = null
+
+    if (roll >= 0.7) {
+      // შავი ხვრელი შუაში: ორივე მხარეს არხი რჩება (ვიწრო გვირაბში მინიმუმ ერთ მხარეს)
+      const r = 30 + Math.random() * 12
+      const cc = this.corridor(wx + r)
+      const hCenter = (cc.top + cc.bottom) / 2
+      const hGap = cc.bottom - cc.top
+      const channel = need + 92
+      if (hGap >= channel + 2 * r + 30) {
+        const lo = cc.top + channel + r // ყველაზე მაღალი ადგილი, სადაც ზემოთ არხი ჯერ კიდევ საკმარისია
+        const hi = cc.bottom - channel - r // ყველაზე დაბალი ადგილი, სადაც ქვემოთ არხი საკმარისია
+        let cy: number
+        if (lo <= hi) {
+          // ორივე არხი საკმარისია — ხვრელი შუა არეშია
+          cy = hCenter + (Math.random() * 2 - 1) * Math.min(hi - hCenter, hCenter - lo)
+        } else {
+          cy = Math.random() < 0.5 ? lo : hi
+        }
+        const topChannel = cy - r - cc.top
+        const bottomChannel = cc.bottom - (cy + r)
+        const passAbs =
+          topChannel >= bottomChannel ? (cc.top + (cy - r)) / 2 : (cy + r + cc.bottom) / 2
+        obstacle = {
+          kind: 'hole',
+          wx,
+          width: r * 2,
+          r,
+          offset: cy - hCenter,
+          passY: passAbs - hCenter,
+        }
+      }
+    } else if (roll >= 0.4) {
+      // ეკალი ჭერიდან ან იატაკიდან
+      const fromTop = Math.random() < 0.5
+      const hMax = Math.min(120, gap - need - 125)
+      if (hMax >= 60) {
+        const height = 60 + Math.random() * (hMax - 60)
+        const freeTop = fromTop ? c.top + height : c.top
+        const freeBottom = fromTop ? c.bottom : c.bottom - height
+        obstacle = {
+          kind: 'spike',
+          wx,
+          width: 84,
+          height,
+          fromTop,
+          passY: (freeTop + freeBottom) / 2 - center,
+        }
+      }
+    }
+
+    if (!obstacle) {
+      // გასაძრომი: ორი სვეტი ჭერიდან და იატაკიდან, შუაში ხვრელით
+      const gapH = need + (140 - 30 * p) + Math.random() * 20
+      const maxOff = Math.max(0, (gap - gapH) / 2 - 14)
+      let abs = center + (Math.random() * 2 - 1) * Math.min(maxOff, 125)
+      abs = Math.max(this.lastRocketPass - 170, Math.min(this.lastRocketPass + 170, abs))
+      abs = Math.max(center - maxOff, Math.min(center + maxOff, abs))
+      obstacle = { kind: 'gate', wx, width: 46, gapOffset: abs - center, gapH, passY: abs - center }
+    }
+
+    this.rocketObs.push(obstacle)
+
+    // დაშორება ისეა, რომ ერთი დაბრკოლებიდან მეორესთან გადასასვლელად დრო ეყოს
+    let passCenter = center
+    if (obstacle.kind === 'hole') {
+      const cc = this.corridor(wx + (obstacle.r ?? 0))
+      passCenter = (cc.top + cc.bottom) / 2
+    }
+    const passAbs = passCenter + obstacle.passY
+    const dy = Math.abs(passAbs - this.lastRocketPass)
+    this.lastRocketPass = passAbs
+    this.nextRocketWx = wx + obstacle.width + level.speed * (0.95 + dy / 210) + 90
+  }
+
+  /** სუპერ-ხტომის ფრენის მანძილი (პიქსელი) პლატფორმის (70 სიმაღლის) ზემოდან ძირამდე */
+  private superJumpFlight(level: LevelConfig): number {
+    const ratio = level.speed / LEVELS[0].speed
+    const gravity = 1900 * ratio
+    const v = 690 * Math.sqrt(ratio) * 1.4
+    const time = (v + Math.sqrt(v * v + 2 * gravity * 70)) / gravity
+    return level.speed * time
+  }
+
   // ---------- დაბრკოლებების ნაკრებები (chunks) ----------
   // ყოველი ნაკრები ისეა აგებული, რომ ერთი ან ორი ხტომით აუცილებლად გადალახვადი იყოს
 
@@ -1062,20 +1449,21 @@ export class CPUDash {
 
     switch (kind) {
       case 'pad': {
+        // სუპერ-ხტომა დამხმარეა: მის შემდეგ ფრენისა და დაშვების ზონა სუფთაა
         this.obstacles.push({ x, width: 150, height: 70, kind: 'super_bridge' })
-        return { length: 150, extraGap: 0 }
+        return { length: 150, extraGap: this.superJumpFlight(level) + speed * 0.25 }
       }
 
       case 'padWall': {
         // სუპერ-ხტომის პლატფორმა + ძალიან მაღალი ბარიერი — მხოლოდ სუპერ-ხტომით გადადიხარ
         this.obstacles.push({ x, width: 150, height: 70, kind: 'super_bridge' })
         this.obstacles.push({
-          x: x + 150 + 110,
+          x: x + 150 + 135,
           width: 40,
           height: 190 + Math.random() * 25,
           kind: 'wall',
         })
-        return { length: 150 + 110 + 40, extraGap: speed * 0.8 }
+        return { length: 150 + 135 + 40, extraGap: this.superJumpFlight(level) + speed * 0.25 }
       }
 
       case 'bridge': {
@@ -1143,7 +1531,7 @@ export class CPUDash {
           this.obstacles.push({ x: x + 46 + comboGap, width: 38, height: 42, kind: 'spike' })
           length = 46 + comboGap + 38
         }
-        return { length, extraGap: length > 46 ? speed * 0.15 : 0 }
+        return { length, extraGap: length > 46 ? speed * 0.25 : speed * 0.15 }
       }
 
       case 'drop': {
@@ -1177,6 +1565,22 @@ export class CPUDash {
         const catchUp = vx * t
         this.obstacles.push({ x: x + catchUp, width: 46, height: 46, kind: 'saw', vx })
         return { length: catchUp + 46, extraGap: speed * 0.12 }
+      }
+
+      case 'pit': {
+        // ორმო მიწაზე: მასზე გადახტომაა საჭირო, ჩავარდნისას თამაში წაგებულია
+        const width = 100 + Math.random() * 30 + Math.max(0, LEVELS.indexOf(level) - 2) * 8
+        this.obstacles.push({ x, width, height: 0, kind: 'pit' })
+        return { length: width, extraGap: speed * 0.12 }
+      }
+
+      case 'pitBridge': {
+        // ფართო ორმო, რომელზეც გადახტომა შეუძლებელია — ხიდზე უნდა ახტე და გადაირბინო
+        const overlap = 60
+        const width = 230 + Math.random() * 90 + Math.max(0, LEVELS.indexOf(level) - 3) * 12
+        this.obstacles.push({ x: x + overlap, width, height: 0, kind: 'pit' })
+        this.obstacles.push({ x, width: width + overlap * 2, height: 82, kind: 'bridge' })
+        return { length: width + overlap * 2, extraGap: speed * 0.3 }
       }
 
       case 'triple': {
@@ -1253,6 +1657,10 @@ export class CPUDash {
       kind = 'drop'
     } else if (hit(f.saw)) {
       kind = 'saw'
+    } else if (hit(f.pit)) {
+      kind = 'pit'
+    } else if (hit(f.pitBridge)) {
+      kind = 'pitBridge'
     } else {
       if (Math.random() > level.obstacleChance) {
         this.nextObstacleX = spawnX + 110
@@ -1267,24 +1675,37 @@ export class CPUDash {
     this.nextObstacleX = x + length + gap + extraGap
   }
 
+  // ლოგიკური ხედვის ზომა: ეკრანის ზომა გაყოფილი მასშტაბზე (ZOOM)
+  private viewW() {
+    return window.innerWidth / ZOOM
+  }
+
+  private viewH() {
+    return window.innerHeight / ZOOM
+  }
+
   private playerX() {
-    return Math.max(75, Math.min(150, window.innerWidth * 0.17))
+    return Math.max(75, Math.min(150, this.viewW() * 0.17))
   }
 
   private groundY() {
-    return window.innerHeight * 0.78
+    return this.viewH() * 0.78
   }
 
   private draw() {
     const ctx = this.ctx
-    const width = window.innerWidth
-    const height = window.innerHeight
+    const realW = window.innerWidth
+    const realH = window.innerHeight
+    const width = this.viewW()
+    const height = this.viewH()
     const level = LEVELS[this.levelIndex] ?? LEVELS[0]
     const ground = this.groundY()
+    const rocketMode = level.mode === 'rocket'
 
-    ctx.clearRect(0, 0, width, height)
+    ctx.clearRect(0, 0, realW, realH)
 
     ctx.save()
+    ctx.scale(ZOOM, ZOOM)
     if (this.shake > 0) {
       const s = Math.min(this.shake * 36, 8)
       ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s)
@@ -1333,6 +1754,7 @@ export class CPUDash {
 
     this.drawSpeedLines(level, width, ground)
 
+    if (!rocketMode) {
     // მიწა
     ctx.fillStyle = '#050c18'
     ctx.fillRect(0, ground, width, height - ground)
@@ -1354,38 +1776,329 @@ export class CPUDash {
     }
     ctx.stroke()
 
+    // ორმოები: უფსკრული და გამაფრთხილებელი კიდეები (ჩავარდნისას თამაში წაგებულია)
+    const pits = this.obstacles.filter(o => o.kind === 'pit').sort((a, b) => a.x - b.x)
+    for (const pit of pits) {
+      const abyss = ctx.createLinearGradient(0, ground, 0, height)
+      abyss.addColorStop(0, '#000000')
+      abyss.addColorStop(1, level.sky[2])
+      ctx.fillStyle = abyss
+      ctx.fillRect(pit.x, ground, pit.width, height - ground + 40)
+
+      const pulse = 0.6 + 0.4 * Math.sin(this.time * 8)
+      ctx.fillStyle = `rgba(255, 70, 90, ${0.55 * pulse})`
+      ctx.fillRect(pit.x - 3, ground, 3, height - ground)
+      ctx.fillRect(pit.x + pit.width, ground, 3, height - ground)
+      for (let k = 0; k < pit.width; k += 20) {
+        ctx.fillStyle = (k / 20) % 2 === 0 ? '#ffcc00' : '#1a1a1a'
+        ctx.fillRect(pit.x + k, ground - 5, Math.min(10, pit.width - k), 5)
+      }
+    }
+
     ctx.strokeStyle = level.color
     ctx.lineWidth = 3
     ctx.shadowColor = level.color
     ctx.shadowBlur = 16
     ctx.beginPath()
-    ctx.moveTo(0, ground)
-    ctx.lineTo(width, ground)
+    let cursor = 0
+    for (const pit of pits) {
+      if (pit.x > cursor) {
+        ctx.moveTo(cursor, ground)
+        ctx.lineTo(Math.min(pit.x, width), ground)
+      }
+      cursor = Math.max(cursor, pit.x + pit.width)
+    }
+    if (cursor < width) {
+      ctx.moveTo(cursor, ground)
+      ctx.lineTo(width, ground)
+    }
     ctx.stroke()
     ctx.shadowBlur = 0
-
-    for (const obstacle of this.obstacles) {
-      this.drawObstacle(obstacle, ground, level.color)
     }
 
-    this.drawCPU(
-      this.playerX(),
-      ground - this.playerSize + this.playerY,
-      this.playerSize,
-      level.color,
-    )
+    if (rocketMode) {
+      this.drawRocketScene(level, width, height)
+    } else {
+      for (const obstacle of this.obstacles) {
+        if (obstacle.kind === 'pit') continue
+        this.drawObstacle(obstacle, ground, level.color)
+      }
+
+      const cpuX = this.playerX()
+      const cpuY = ground - this.playerSize + this.playerY
+      if (this.flipAngle !== 0) {
+        const cx = cpuX + this.playerSize / 2
+        const cy = cpuY + this.playerSize / 2
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.rotate(this.flipAngle)
+        ctx.translate(-cx, -cy)
+        this.drawCPU(cpuX, cpuY, this.playerSize, level.color)
+        ctx.restore()
+      } else {
+        this.drawCPU(cpuX, cpuY, this.playerSize, level.color)
+      }
+    }
 
     ctx.restore()
 
     if (this.levelFade > 0) {
       ctx.fillStyle = rgba(level.color, this.levelFade * 0.35)
-      ctx.fillRect(0, 0, width, height)
+      ctx.fillRect(0, 0, realW, realH)
     }
 
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(255,50,70,${Math.min(this.flash * 2, 0.3)})`
-      ctx.fillRect(0, 0, width, height)
+      ctx.fillRect(0, 0, realW, realH)
     }
+  }
+
+  private drawRocketScene(level: LevelConfig, W: number, H: number) {
+    const ctx = this.ctx
+    const step = 12
+    const n = Math.ceil(W / step) + 1
+    const tops: number[] = []
+    const bottoms: number[] = []
+    for (let i = 0; i <= n; i++) {
+      const c = this.corridor(this.scroll + i * step)
+      tops.push(c.top)
+      bottoms.push(c.bottom)
+    }
+
+    // კედლები: ჭერი და იატაკი
+    const wall = ctx.createLinearGradient(0, 0, 0, H)
+    wall.addColorStop(0, '#05010f')
+    wall.addColorStop(0.5, '#1b0b3a')
+    wall.addColorStop(1, '#05010f')
+    ctx.fillStyle = wall
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    for (let i = 0; i <= n; i++) ctx.lineTo(i * step, tops[i])
+    ctx.lineTo(n * step, 0)
+    ctx.closePath()
+    ctx.fill()
+    ctx.beginPath()
+    ctx.moveTo(0, H)
+    for (let i = 0; i <= n; i++) ctx.lineTo(i * step, bottoms[i])
+    ctx.lineTo(n * step, H)
+    ctx.closePath()
+    ctx.fill()
+
+    // საშიში კიდეები: წითელი გაფრთხილება და ნეონის ხაზი
+    ctx.save()
+    for (const edge of [tops, bottoms]) {
+      const dir = edge === tops ? 1 : -1
+      ctx.strokeStyle = 'rgba(255, 70, 90, 0.35)'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      for (let i = 0; i <= n; i++) {
+        if (i === 0) ctx.moveTo(0, edge[0] + dir * 9)
+        else ctx.lineTo(i * step, edge[i] + dir * 9)
+      }
+      ctx.stroke()
+
+      ctx.strokeStyle = level.color
+      ctx.lineWidth = 3
+      ctx.shadowColor = level.color
+      ctx.shadowBlur = 14
+      ctx.beginPath()
+      for (let i = 0; i <= n; i++) {
+        if (i === 0) ctx.moveTo(0, edge[0])
+        else ctx.lineTo(i * step, edge[i])
+      }
+      ctx.stroke()
+      ctx.shadowBlur = 0
+    }
+    ctx.restore()
+
+    // ფინიშის ჭიშკარი
+    for (const obstacle of this.obstacles) {
+      if (obstacle.kind !== 'finish') continue
+      for (let y = 0; y < H; y += 24) {
+        ctx.fillStyle = (y / 24) % 2 === 0 ? '#ffffff' : '#111111'
+        ctx.fillRect(obstacle.x, y, 24, 24)
+        ctx.fillStyle = (y / 24) % 2 === 0 ? '#111111' : '#ffffff'
+        ctx.fillRect(obstacle.x + 24, y, 24, 24)
+      }
+    }
+
+    this.drawRocketObstacles(level, H)
+    this.drawRocket(level)
+
+    // მინიშნება დასაწყისში
+    if (this.levelTime < 6) {
+      ctx.save()
+      ctx.globalAlpha = Math.min(1, (6 - this.levelTime) / 1.5)
+      ctx.textAlign = 'center'
+      ctx.font = '700 20px Inter, system-ui, sans-serif'
+      ctx.fillStyle = '#ffffff'
+      ctx.shadowColor = level.color
+      ctx.shadowBlur = 12
+      ctx.fillText('დაჭერა (SPACE / მაუსი) — ზემოთ   •   გაშვება — ქვემოთ', W / 2, H * 0.17)
+      ctx.restore()
+    }
+  }
+
+  private drawRocketObstacles(level: LevelConfig, H: number) {
+    const ctx = this.ctx
+
+    for (const o of this.rocketObs) {
+      const sx = o.wx - this.scroll
+      if (sx > this.viewW() + 120 || sx + o.width < -120) continue
+
+      if (o.kind === 'gate') {
+        const c = this.corridor(o.wx)
+        const gapCenter = (c.top + c.bottom) / 2 + (o.gapOffset ?? 0)
+        const half = (o.gapH ?? 150) / 2
+        const topEdge = gapCenter - half
+        const bottomEdge = gapCenter + half
+
+        const body = ctx.createLinearGradient(sx, 0, sx + o.width, 0)
+        body.addColorStop(0, '#2b1560')
+        body.addColorStop(0.5, '#4a2590')
+        body.addColorStop(1, '#2b1560')
+        ctx.fillStyle = body
+        ctx.fillRect(sx, 0, o.width, topEdge)
+        ctx.fillRect(sx, bottomEdge, o.width, H - bottomEdge)
+
+        // გამაფრთხილებელი ზოლები ხვრელის კიდეებზე
+        for (let k = 0; k < o.width; k += 12) {
+          ctx.fillStyle = (k / 12) % 2 === 0 ? '#ffcc00' : '#1a1a1a'
+          ctx.fillRect(sx + k, topEdge - 8, Math.min(12, o.width - k), 8)
+          ctx.fillRect(sx + k, bottomEdge, Math.min(12, o.width - k), 8)
+        }
+        ctx.save()
+        ctx.strokeStyle = level.color
+        ctx.lineWidth = 2
+        ctx.shadowColor = level.color
+        ctx.shadowBlur = 10
+        ctx.strokeRect(sx, -4, o.width, topEdge + 4)
+        ctx.strokeRect(sx, bottomEdge, o.width, H - bottomEdge + 4)
+        ctx.restore()
+      } else if (o.kind === 'spike') {
+        const h = o.height ?? 80
+        const c = this.corridor(o.wx + o.width / 2)
+        const dir = o.fromTop ? 1 : -1
+        const baseY = (o.fromTop ? c.top : c.bottom) - dir * 6
+        const tipY = (o.fromTop ? c.top : c.bottom) + dir * h
+
+        const grad = ctx.createLinearGradient(0, baseY, 0, tipY)
+        grad.addColorStop(0, '#4a2590')
+        grad.addColorStop(1, '#ff4d6d')
+        ctx.save()
+        ctx.fillStyle = grad
+        ctx.strokeStyle = '#ff9aaa'
+        ctx.lineWidth = 2
+        ctx.shadowColor = '#ff4d6d'
+        ctx.shadowBlur = 12
+        ctx.beginPath()
+        ctx.moveTo(sx, baseY)
+        ctx.lineTo(sx + o.width, baseY)
+        ctx.lineTo(sx + o.width / 2, tipY)
+        ctx.closePath()
+        ctx.fill()
+        ctx.stroke()
+        ctx.restore()
+      } else {
+        const r = o.r ?? 38
+        const c = this.corridor(o.wx + r)
+        const cy = (c.top + c.bottom) / 2 + (o.offset ?? 0)
+        const t = this.time
+        const hx = sx + r
+
+        ctx.save()
+        // გარე ნათება
+        const halo = ctx.createRadialGradient(hx, cy, r * 0.8, hx, cy, r * 2.2)
+        halo.addColorStop(0, 'rgba(176, 107, 255, 0.45)')
+        halo.addColorStop(1, 'rgba(176, 107, 255, 0)')
+        ctx.fillStyle = halo
+        ctx.fillRect(hx - r * 2.2, cy - r * 2.2, r * 4.4, r * 4.4)
+
+        // მბრუნავი დისკო
+        ctx.lineWidth = 3
+        for (let k = 0; k < 3; k++) {
+          ctx.strokeStyle = `rgba(${200 + k * 20}, ${120 + k * 40}, 255, ${0.8 - k * 0.2})`
+          ctx.beginPath()
+          ctx.ellipse(hx, cy, r * (1.35 - k * 0.12), r * (0.55 - k * 0.08), t * (1.4 + k * 0.5), 0, Math.PI * 1.5)
+          ctx.stroke()
+        }
+
+        // ხვრელი
+        const core = ctx.createRadialGradient(hx, cy, 2, hx, cy, r)
+        core.addColorStop(0, '#000000')
+        core.addColorStop(0.8, '#0a0016')
+        core.addColorStop(1, '#3d1a7a')
+        ctx.fillStyle = core
+        ctx.beginPath()
+        ctx.arc(hx, cy, r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
+    }
+  }
+
+  private drawRocket(level: LevelConfig) {
+    const ctx = this.ctx
+    const x = this.playerX()
+    const y = this.rocketY
+    const tilt = Math.max(-0.4, Math.min(0.4, this.rocketVY / 900))
+
+    ctx.save()
+    ctx.translate(x + ROCKET.width / 2, y)
+    ctx.rotate(tilt)
+    ctx.translate(-ROCKET.width / 2, 0)
+
+    // ალი
+    const flame = (this.jumpHeld ? 36 : 15) + Math.random() * 10
+    const fg = ctx.createLinearGradient(0, 0, -flame, 0)
+    fg.addColorStop(0, '#fff3a0')
+    fg.addColorStop(0.5, '#ff9a3c')
+    fg.addColorStop(1, 'rgba(255, 60, 30, 0)')
+    ctx.fillStyle = fg
+    ctx.beginPath()
+    ctx.moveTo(0, -7)
+    ctx.lineTo(-flame, 0)
+    ctx.lineTo(0, 7)
+    ctx.closePath()
+    ctx.fill()
+
+    // ფრთები
+    ctx.fillStyle = '#e0405a'
+    ctx.beginPath()
+    ctx.moveTo(4, -9)
+    ctx.lineTo(18, -9)
+    ctx.lineTo(2, -17 + 6)
+    ctx.closePath()
+    ctx.fill()
+    ctx.beginPath()
+    ctx.moveTo(4, 9)
+    ctx.lineTo(18, 9)
+    ctx.lineTo(2, 17)
+    ctx.closePath()
+    ctx.fill()
+
+    // კორპუსი
+    ctx.shadowColor = level.color
+    ctx.shadowBlur = 14
+    ctx.fillStyle = '#e8f4ff'
+    ctx.beginPath()
+    ctx.moveTo(0, -11)
+    ctx.lineTo(42, -11)
+    ctx.quadraticCurveTo(66, 0, 42, 11)
+    ctx.lineTo(0, 11)
+    ctx.closePath()
+    ctx.fill()
+    ctx.shadowBlur = 0
+    ctx.fillStyle = '#e0405a'
+    ctx.fillRect(26, -11, 7, 22)
+    ctx.fillStyle = '#3d9bff'
+    ctx.beginPath()
+    ctx.arc(46, 0, 5, 0, Math.PI * 2)
+    ctx.fill()
+
+    // გმირი რაკეტაზე
+    this.drawCPU(10, -ROCKET.top, this.playerSize * 0.9, level.color)
+    ctx.restore()
   }
 
   private drawSpeedLines(level: LevelConfig, W: number, G: number) {
@@ -2231,7 +2944,7 @@ export class CPUDash {
   private showQuestion() {
     const questionIndex = this.pickQuestion()
     this.currentQuestionIndex = questionIndex
-    const question = QUESTION_BANK[questionIndex]
+    const question = this.bank[questionIndex]
     const modal = this.root.querySelector('.cpu-modal') as HTMLDivElement
 
     modal.hidden = false
@@ -2272,10 +2985,12 @@ export class CPUDash {
         return
       }
 
-      const correct = this.isCorrect(question, answer)
+      const correct = this.isCorrect(question, answer, input.value)
 
       if (!correct) {
-        feedback.textContent = 'პასუხი არასწორია. გამოწვევა თავიდან იწყება…'
+        feedback.textContent = question.hint
+          ? `პასუხი არასწორია. ${question.hint} გამოწვევა თავიდან იწყება…`
+          : 'პასუხი არასწორია. გამოწვევა თავიდან იწყება…'
         input.disabled = true
         ;(form.querySelector('button') as HTMLButtonElement).disabled = true
 
@@ -2286,7 +3001,7 @@ export class CPUDash {
           this.questionOpen = false
           this.running = true
           this.lastTime = performance.now()
-        }, 1100)
+        }, question.hint ? 2600 : 1100)
         return
       }
 
@@ -2322,13 +3037,13 @@ export class CPUDash {
   }
 
   private pickQuestion() {
-    const available = QUESTION_BANK
+    const available = this.bank
       .map((_, index) => index)
       .filter(index => !this.answeredQuestionIndices.has(index))
 
     const pool = available.length > 0
       ? available
-      : QUESTION_BANK.map((_, index) => index)
+      : this.bank.map((_, index) => index)
 
     let candidates = pool.filter(index => index !== this.lastQuestion)
     if (candidates.length === 0) candidates = pool
@@ -2338,7 +3053,8 @@ export class CPUDash {
     return index
   }
 
-  private isCorrect(question: Question, answer: string) {
+  private isCorrect(question: Question, answer: string, raw = answer) {
+    if (question.check) return question.check(raw)
     const expected = question.answers.map(a => this.normalize(a))
     if (expected.includes(answer)) return true
     if (!question.anyOf) return false
@@ -2390,6 +3106,10 @@ export class CPUDash {
     cancelAnimationFrame(this.frame)
 
     window.removeEventListener('keydown', this.keyHandler, true)
+    window.removeEventListener('keyup', this.keyUpHandler, true)
+    window.removeEventListener('pointerup', this.releaseHandler)
+    window.removeEventListener('pointercancel', this.releaseHandler)
+    window.removeEventListener('blur', this.releaseHandler)
     window.removeEventListener('resize', this.resizeHandler)
     this.root.removeEventListener('pointerdown', this.pointerHandler)
 

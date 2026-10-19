@@ -15,7 +15,12 @@ import { CollisionSystem } from './Collision'
 import { Player } from './Player'
 import { GameCamera } from './Camera'
 import { CPUDash } from '../minigames/CPUDash'
+import { GameState } from '../progress/GameState'
+import { ECONOMY, GAMES } from '../progress/economy'
+import { KingdomPanels } from '../ui/KingdomPanels'
+import { questionsForGame } from '../content/topics'
 import { TypingGrandmaster } from '../minigames/TypingGrandmaster'
+import { FlappyFloppy } from '../minigames/FlappyFloppy'
 
 import {
   createKingdomWorld,
@@ -33,15 +38,6 @@ type WorldName = 'island' | 'kingdom'
 const FORGE_INTRO_TEXT =
   'სამჭედლოში უნდა გამოვწრთოთ შენი ცოდნა, რომელიც იქნება ისეთივე ბასრი, როგორც სამურაის ხმალი. წინ გელოდება თამაშის სამყარო, თუმცა დაბრკოლებებით სავსე. მზად ხარ ამ გამოწვევისთვის?'
 
-const MINI_GAMES = [
-  'CPU Dash',
-  'Ping-Pong-Dong',
-  'Cliff Climber',
-  'Flappy Floppy',
-  'Jump Up Tower',
-  'Typing Grandmaster',
-]
-
 export class Game {
   private readonly scene: THREE.Scene
   private readonly renderer: THREE.WebGLRenderer
@@ -54,6 +50,9 @@ export class Game {
   private readonly islandCollision: CollisionSystem
   private readonly kingdomCollision: CollisionSystem
   private readonly kingdom: KingdomWorldData
+  private readonly state: GameState
+  private readonly panels: KingdomPanels
+  private readonly hud: HTMLDivElement
   private readonly sun: THREE.DirectionalLight | null
   private readonly cycle: DayNightCycle | null
   private lastTimeLabel = ''
@@ -68,6 +67,8 @@ export class Game {
   private cpuDash: CPUDash | null = null
 
   private typingGrandmasterActive = false
+  private flappyActive = false
+  private flappyFloppy: FlappyFloppy | null = null
   private typingGrandmaster: TypingGrandmaster | null = null
 
   private currentWorld: WorldName = 'island'
@@ -203,6 +204,37 @@ export class Game {
     document.body.appendChild(this.locationLabel)
     this.updateLocationLabel()
 
+    // პროგრესი (მონეტები, წიგნები, გახსნილი თამაშები) მხოლოდ მიმდინარე სესიაში ინახება
+    this.state = new GameState()
+
+    this.panels = new KingdomPanels({
+      state: this.state,
+      getGrade: () => this.grade,
+      toast: text => this.showToast(text),
+      onClose: () => this.updateInteractions(),
+    })
+
+    this.hud = document.createElement('div')
+    this.hud.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      padding: 10px 16px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.9);
+      color: #29445d;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      font-weight: bold;
+      pointer-events: none;
+      box-shadow: 0 3px 14px rgba(0,0,0,0.15);
+    `
+    document.body.appendChild(this.hud)
+    this.updateHud()
+    this.state.onChange(() => this.updateHud())
+    window.addEventListener('beforeunload', this.onBeforeUnload)
+
     this.pauseMenu = new PauseMenu()
     this.pauseMenu.onAction(this.handlePauseAction)
 
@@ -296,10 +328,59 @@ export class Game {
     return Math.hypot(position.x - x, position.z - z)
   }
 
+  // სამჭედლო და მისი თამაშები მესამე და მეოთხე კლასისთვის ირთვება
+  private miniGameActive(): boolean {
+    return this.cpuDashActive || this.typingGrandmasterActive || this.flappyActive
+  }
+
+  private forgeEnabled(): boolean {
+    return this.grade === 3 || this.grade === 4
+  }
+
+  private updateHud() {
+    this.hud.textContent = `🪙 ${this.state.coins}   📘 ${this.state.books}`
+  }
+
+  private showToast(text: string) {
+    const toast = document.createElement('div')
+    toast.textContent = text
+    toast.style.cssText = `
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100000;
+      padding: 12px 22px;
+      border-radius: 14px;
+      background: rgba(21, 42, 64, 0.95);
+      color: white;
+      font-family: Arial, sans-serif;
+      font-size: 17px;
+      font-weight: bold;
+      pointer-events: none;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+      transition: opacity 0.4s;
+    `
+    document.body.appendChild(toast)
+
+    setTimeout(() => {
+      toast.style.opacity = '0'
+    }, 1800)
+    setTimeout(() => toast.remove(), 2300)
+  }
+
+  private onBeforeUnload = (event: BeforeUnloadEvent) => {
+    // გვერდის შემთხვევით დახურვისას პროგრესი რომ არ დაიკარგოს
+    if (this.state.hasProgress()) {
+      event.preventDefault()
+    }
+  }
+
   private isForgeModalOpen() {
     return (
       this.forgeIntroOverlay !== null ||
-      this.forgeGamesOverlay !== null
+      this.forgeGamesOverlay !== null ||
+      this.panels.isOpen()
     )
   }
 
@@ -308,8 +389,7 @@ export class Game {
       this.paused ||
       this.changingGrade ||
       this.isForgeModalOpen() ||
-      this.cpuDashActive ||
-      this.typingGrandmasterActive
+      this.miniGameActive()
     ) {
       this.currentInteraction = null
       this.interactionPrompt.style.display = 'none'
@@ -329,7 +409,7 @@ export class Game {
         let nearestDistance = Infinity
 
         for (const building of this.kingdom.buildings) {
-          if (building.id === 'forge' && this.grade !== 4) {
+          if (building.id === 'forge' && !this.forgeEnabled()) {
             continue
           }
 
@@ -435,7 +515,7 @@ export class Game {
   }
 
   private showForgeIntro() {
-    if (this.grade !== 4 || this.isForgeModalOpen()) return
+    if (!this.forgeEnabled() || this.isForgeModalOpen()) return
 
     this.interactionPrompt.style.display = 'none'
     this.currentInteraction = null
@@ -509,13 +589,15 @@ export class Game {
   }
 
   private showForgeGames() {
-    if (this.grade !== 4) {
+    if (!this.forgeEnabled()) {
       this.closeForgeModal()
       return
     }
 
     this.forgeIntroOverlay?.remove()
     this.forgeIntroOverlay = null
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
 
     const overlay = this.createModalOverlay()
     const card = this.createModalCard()
@@ -534,11 +616,24 @@ export class Game {
 
     const subtitle = document.createElement('p')
     subtitle.textContent =
-      'თითოეული თამაში ახალი უნარის გამომუშავებაში დაგეხმარება.'
+      `თამაშის გასახსნელად ${ECONOMY.BOOKS_PER_GAME} 📘 გჭირდება. წიგნებს აკადემიაში ან მაღაზიაში მიიღებ.`
     subtitle.style.cssText = `
-      margin: 0 0 22px;
+      margin: 0 0 14px;
       color: #536579;
       line-height: 1.6;
+    `
+
+    const balance = document.createElement('div')
+    balance.textContent = `🪙 ${this.state.coins}      📘 ${this.state.books}`
+    balance.style.cssText = `
+      display: inline-block;
+      margin-bottom: 16px;
+      padding: 8px 18px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.85);
+      border: 1px solid #d1dfeb;
+      font-weight: bold;
+      font-size: 17px;
     `
 
     const list = document.createElement('div')
@@ -549,9 +644,11 @@ export class Game {
       text-align: left;
     `
 
-    const gameIcons = ['💻', '🏓', '🧗', '🐦', '🗼', '⌨️']
+    for (const game of GAMES) {
+      const unlocked = game.free || this.state.isGameUnlocked(game.id)
+      const playable = game.available && unlocked
+      const buyable = game.available && !unlocked
 
-    for (let i = 0; i < MINI_GAMES.length; i++) {
       const item = document.createElement('div')
 
       item.style.cssText = `
@@ -568,41 +665,61 @@ export class Game {
       `
 
       const gameIcon = document.createElement('span')
-      gameIcon.textContent = gameIcons[i]
+      gameIcon.textContent = game.icon
       gameIcon.style.fontSize = '27px'
 
       const details = document.createElement('div')
       details.style.cssText = 'display: flex; flex-direction: column; gap: 5px;'
 
       const name = document.createElement('span')
-      name.textContent = MINI_GAMES[i]
+      name.textContent = game.name
 
-      const isPlayable = i === 0 || i === 5
       const status = document.createElement('small')
-      status.textContent = isPlayable ? '▶ თამაში' : 'მალე დაემატება'
+      status.textContent = playable
+        ? game.free
+          ? '▶ თამაში (უფასო)'
+          : '▶ თამაში'
+        : buyable
+          ? `🔒 გახსნა — ${ECONOMY.BOOKS_PER_GAME} 📘`
+          : 'მალე დაემატება'
       status.style.cssText = `
-        color: ${isPlayable ? '#18834a' : '#718197'};
-        font-size: 11px;
+        color: ${playable ? '#18834a' : buyable ? '#b36b00' : '#718197'};
+        font-size: 12px;
         font-weight: normal;
       `
 
       details.append(name, status)
       item.append(gameIcon, details)
 
-      if (isPlayable) {
+      if (playable || buyable) {
         item.style.cursor = 'pointer'
-        item.style.border = '2px solid #38a169'
-        item.style.background = 'linear-gradient(135deg, #f0fff4, #ffffff)'
+        item.style.border = playable ? '2px solid #38a169' : '2px solid #e0a030'
+        item.style.background = playable
+          ? 'linear-gradient(135deg, #f0fff4, #ffffff)'
+          : 'linear-gradient(135deg, #fff7e6, #ffffff)'
         item.setAttribute('role', 'button')
         item.tabIndex = 0
-        item.setAttribute('aria-label', `${MINI_GAMES[i]} თამაშის დაწყება`)
+        item.setAttribute('aria-label', `${game.name}`)
 
-        const startGameHandler = () => {
-          if (i === 0) this.startCPUDash()
-          if (i === 5) this.startTypingGrandmaster()
+        const handler = () => {
+          if (playable) {
+            if (game.id === 'cpu-dash') this.startCPUDash()
+            if (game.id === 'typing-grandmaster') this.startTypingGrandmaster()
+            if (game.id === 'flappy-floppy') this.startFlappyFloppy()
+            return
+          }
+
+          if (this.state.unlockGame(game.id)) {
+            this.showToast(`🔓 ${game.name} გაიხსნა!`)
+            this.showForgeGames()
+          } else {
+            this.showToast(
+              `არ გაკლია წიგნი: ${game.name}-ის გასახსნელად ${ECONOMY.BOOKS_PER_GAME} 📘 გჭირდება`
+            )
+          }
         }
 
-        item.addEventListener('click', startGameHandler)
+        item.addEventListener('click', handler)
         item.addEventListener('mouseenter', () => {
           item.style.transform = 'translateY(-2px)'
           item.style.boxShadow = '0 8px 18px rgba(25, 120, 70, 0.18)'
@@ -614,7 +731,7 @@ export class Game {
         item.addEventListener('keydown', event => {
           if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault()
-            startGameHandler()
+            handler()
           }
         })
       } else {
@@ -643,7 +760,7 @@ export class Game {
       this.closeForgeModal()
     })
 
-    card.append(icon, title, subtitle, list, footer, closeButton)
+    card.append(icon, title, subtitle, balance, list, footer, closeButton)
     overlay.appendChild(card)
     document.body.appendChild(overlay)
 
@@ -651,7 +768,8 @@ export class Game {
   }
 
   private startCPUDash() {
-    if (this.grade !== 4 || this.cpuDashActive) return
+    if (!this.forgeEnabled() || this.cpuDashActive) return
+    if (!this.state.isGameUnlocked('cpu-dash')) return
 
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
@@ -663,7 +781,15 @@ export class Game {
     this.cpuDashActive = true
     this.clock.getDelta()
 
+    // საკონტროლო კითხვები = აკადემიის იგივე კითხვები (თუ ამ კლასს თემა აქვს)
+    const gameQuestions = questionsForGame(
+      this.grade,
+      this.state.openedTopicIds(),
+      (topicId, questionId) => this.state.isSolved(topicId, questionId),
+    )
+
     this.cpuDash = new CPUDash({
+      questions: gameQuestions.length > 0 ? gameQuestions : undefined,
       onClose: () => {
         this.cpuDash = null
         this.cpuDashActive = false
@@ -674,7 +800,7 @@ export class Game {
   }
 
   private startTypingGrandmaster() {
-    if (this.grade !== 4 || this.typingGrandmasterActive) return
+    if (!this.forgeEnabled() || this.typingGrandmasterActive) return
 
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
@@ -693,13 +819,43 @@ export class Game {
         this.clock.getDelta()
         this.updateInteractions()
       },
+      onStageComplete: (stage) => {
+        const coins = ECONOMY.TYPING_COINS_PER_STAGE
+        this.state.addTypingCoins(coins)
+        this.showToast(`🪙 +${coins} მონეტა — ეტაპი ${stage} დასრულდა!`)
+      },
       onSuccess: (stats) => {
         console.log('Typing Grandmaster completed:', stats)
       },
     })
   }
 
+  private startFlappyFloppy() {
+    if (!this.forgeEnabled() || this.flappyActive) return
+    if (!this.state.isGameUnlocked('flappy-floppy')) return
+
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
+    this.forgeIntroOverlay?.remove()
+    this.forgeIntroOverlay = null
+
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+    this.flappyActive = true
+    this.clock.getDelta()
+
+    this.flappyFloppy = new FlappyFloppy({
+      onClose: () => {
+        this.flappyFloppy = null
+        this.flappyActive = false
+        this.clock.getDelta()
+        this.updateInteractions()
+      },
+    })
+  }
+
   private closeForgeModal() {
+    this.panels.close()
     this.forgeIntroOverlay?.remove()
     this.forgeGamesOverlay?.remove()
 
@@ -758,7 +914,7 @@ export class Game {
 
   private onKeyDown = (event: KeyboardEvent) => {
     if (this.changingGrade) return
-    if (this.cpuDashActive || this.typingGrandmasterActive) return
+    if (this.miniGameActive()) return
 
     if (event.code === 'Escape' && this.isForgeModalOpen()) {
       event.preventDefault()
@@ -828,9 +984,29 @@ export class Game {
       const building = this.currentInteraction.building
 
       if (building.id === 'forge') {
-        if (this.grade === 4) {
+        if (this.forgeEnabled()) {
           this.showForgeIntro()
         }
+        return
+      }
+
+      if (building.id === 'library') {
+        this.panels.openLibrary()
+        return
+      }
+
+      if (building.id === 'academy') {
+        this.panels.openAcademy()
+        return
+      }
+
+      if (building.id === 'market') {
+        this.panels.openShop()
+        return
+      }
+
+      if (building.id === 'treasury') {
+        this.panels.openWallet()
         return
       }
 
@@ -934,7 +1110,7 @@ export class Game {
 
     const modalOpen = this.isForgeModalOpen()
 
-    if (!this.paused && !this.changingGrade && !modalOpen && !this.cpuDashActive && !this.typingGrandmasterActive) {
+    if (!this.paused && !this.changingGrade && !modalOpen && !this.miniGameActive()) {
       this.player.update(
         delta,
         this.gameCamera.yaw

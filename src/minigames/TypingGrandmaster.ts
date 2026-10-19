@@ -8,6 +8,8 @@ export type TypingStats = {
 export type TypingGrandmasterOptions = {
   onClose?: () => void
   onSuccess?: (stats: TypingStats) => void
+  /** იძახება ყოველი ეტაპის დასრულებისას (stage = 1..5) */
+  onStageComplete?: (stage: number) => void
 }
 
 type Platform = {
@@ -309,10 +311,12 @@ export class TypingGrandmaster {
   private readonly resizeHandler = () => this.resize()
   private onClose?: () => void
   private onSuccess?: (stats: TypingStats) => void
+  private onStageComplete?: (stage: number) => void
 
   constructor(options: TypingGrandmasterOptions = {}) {
     this.onClose = options.onClose
     this.onSuccess = options.onSuccess
+    this.onStageComplete = options.onStageComplete
     this.createInterface()
     this.initBackgroundEffects()
     this.start()
@@ -641,6 +645,8 @@ export class TypingGrandmaster {
       this.targetPlayerPos = { x: nextP.x + nextP.width / 2, y: nextP.y }
       this.targetCameraY = nextP.y - window.innerHeight * 0.6
     } else {
+      // ეტაპი დასრულდა — ჯილდოს გასაცემად გარეთ ვაცნობებთ (stage: 1-დან)
+      this.onStageComplete?.(this.stageIndex + 1)
       this.stageIndex++
       if (this.stageIndex < STAGES.length) {
         // გარემოს გადასვლა წინა ეტაპიდან ახალზე
