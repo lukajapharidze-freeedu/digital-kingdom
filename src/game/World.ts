@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 
+import { createSchoolLogoMesh } from '../assets/schoolLogo'
+
 import {
   type WorldCollider,
 } from './Collision'
@@ -701,6 +703,18 @@ function createCastle(
     Math.PI / 4
 
   castle.add(crown)
+
+  // სკოლის ლოგო სასახლის წინა კედელზე, კარის ზემოთ
+  const logo =
+    createSchoolLogoMesh(1.7)
+
+  logo.position.set(
+    0,
+    3.05,
+    1.32
+  )
+
+  castle.add(logo)
 
   castle.position.set(
     x,

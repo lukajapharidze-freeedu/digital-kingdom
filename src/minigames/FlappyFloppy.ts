@@ -50,6 +50,10 @@ const PHYS = {
 
 /** ყოველ რამდენ ქულაზე იცვლება ფონი */
 const POINTS_PER_THEME = 10
+
+// ნათება (shadowBlur) მძიმეა სუსტ კომპიუტერებზე. true-ზე დააყენე, თუ ლამაზი ნათება გინდა.
+const GLOW = false
+const fxBlur = (n: number): number => (GLOW ? n : 0)
 const TRANSITION_SECONDS = 2.4
 
 const THEMES: Theme[] = [
@@ -217,7 +221,7 @@ export class FlappyFloppy {
   private readonly resizeHandler = () => this.resize()
 
   private resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.25)
     const realW = window.innerWidth
     const realH = window.innerHeight
     this.canvas.width = Math.floor(realW * dpr)
@@ -759,7 +763,7 @@ export class FlappyFloppy {
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 3
       ctx.shadowColor = theme.accent
-      ctx.shadowBlur = 20
+      ctx.shadowBlur = fxBlur(20)
       ctx.beginPath()
       let bx = W * (0.2 + hash(idx) * 0.7)
       let by = 0
@@ -863,7 +867,7 @@ export class FlappyFloppy {
 
       // თავსახურები ხვრელის კიდეებზე
       ctx.shadowColor = accent
-      ctx.shadowBlur = 14
+      ctx.shadowBlur = fxBlur(14)
       ctx.fillStyle = '#16295a'
       ctx.strokeStyle = accent
       ctx.lineWidth = 3
@@ -873,7 +877,7 @@ export class FlappyFloppy {
       ctx.strokeRect(g.x - 6, bottomEdge, GATE_W + 12, 26)
 
       // გვერდითი ნათება
-      ctx.shadowBlur = 10
+      ctx.shadowBlur = fxBlur(10)
       ctx.beginPath()
       ctx.moveTo(g.x, 0)
       ctx.lineTo(g.x, topEdge - 26)
@@ -900,7 +904,7 @@ export class FlappyFloppy {
     ctx.strokeStyle = accent
     ctx.lineWidth = 3
     ctx.shadowColor = accent
-    ctx.shadowBlur = 16
+    ctx.shadowBlur = fxBlur(16)
     ctx.beginPath()
     ctx.moveTo(0, FLOOR_Y)
     ctx.lineTo(W, FLOOR_Y)
@@ -937,7 +941,7 @@ export class FlappyFloppy {
     ctx.translate(this.floppyX, this.floppyY)
     ctx.rotate(this.angle)
     ctx.shadowColor = accent
-    ctx.shadowBlur = 18
+    ctx.shadowBlur = fxBlur(18)
 
     // კორპუსი (კუთხე მოჭრილი)
     ctx.fillStyle = '#1d2a4a'
@@ -989,7 +993,7 @@ export class FlappyFloppy {
     ctx.strokeText(String(this.score), 0, 0)
     ctx.fillStyle = '#ffffff'
     ctx.shadowColor = accent
-    ctx.shadowBlur = 18
+    ctx.shadowBlur = fxBlur(18)
     ctx.fillText(String(this.score), 0, 0)
     ctx.restore()
 
@@ -1000,7 +1004,7 @@ export class FlappyFloppy {
       ctx.font = '700 22px Inter, system-ui, sans-serif'
       ctx.fillStyle = '#ffffff'
       ctx.shadowColor = accent
-      ctx.shadowBlur = 14
+      ctx.shadowBlur = fxBlur(14)
       ctx.fillText(this.bannerText, W / 2, 140)
       ctx.restore()
     }
@@ -1011,7 +1015,7 @@ export class FlappyFloppy {
       ctx.font = '700 22px Inter, system-ui, sans-serif'
       ctx.fillStyle = '#ffffff'
       ctx.shadowColor = accent
-      ctx.shadowBlur = 12
+      ctx.shadowBlur = fxBlur(12)
       const pulse2 = 0.7 + 0.3 * Math.sin(this.time * 4)
       ctx.globalAlpha = pulse2
       ctx.fillText('დააჭირე: SPACE / ↑ / კლიკი — დისკეტა ზემოთ ადის', W / 2, H / 2 + 110)

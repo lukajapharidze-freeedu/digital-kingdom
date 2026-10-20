@@ -1,6 +1,7 @@
 import * as THREE from 'three'
+import { createSchoolLogoMesh } from '../assets/schoolLogo'
 import {
-  type BuildContext, P, make, block, cyl, cone, group, place, gable, shield,
+  type BuildContext, P, make, block, cyl, cone, group, place, gable,
   archWindow, cylinderWindow, doorArch, steps, column, merlonsRect,
   banner, flag, torch, cylG, coneG, icoG, octG, torusG, domeG,
 } from './KingdomKit'
@@ -36,7 +37,10 @@ export function buildCastle(ctx: BuildContext, parent: THREE.Object3D) {
     cyl(g, 0.05, 0.05, 2.1, P.iron, i * 0.38, 2.9, 3.66, 5, false)
   }
   for (const y of [3.4, 4.1, 4.8]) block(g, 3.0, 0.08, 0.1, P.iron, 0, y, 3.67, false)
-  shield(g, 0, 6.6, 3.5, 0.95, P.deepBlue)
+  // სკოლის ლოგო შესასვლელის ზემოთ
+  const logo = createSchoolLogoMesh(2.2)
+  logo.position.set(0, 6.55, 3.56)
+  g.add(logo)
   steps(g, 0, 3.6, 5.2, 3, P.base)
 
   for (const x of [-2.1, 2.1]) torch(ctx, g, x, 2.3, 3.68)

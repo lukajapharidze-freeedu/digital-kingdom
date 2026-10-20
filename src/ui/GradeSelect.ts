@@ -4,6 +4,8 @@ import {
   createCharacter,
 } from '../characters/Character'
 
+import { SCHOOL_LOGO_URL } from '../assets/schoolLogo'
+
 export type Grade =
   | 2
   | 3
@@ -35,11 +37,16 @@ export function showGradeSelect():
         <div class="grade-select-content">
 
           <div class="game-logo">
-            <div class="logo-crown">
-              ♛
-            </div>
+            <img
+              class="school-logo"
+              src="${SCHOOL_LOGO_URL}"
+              alt="თბილისის თავისუფალი სკოლა"
+              draggable="false"
+            />
 
-            DIGITAL KINGDOM
+            <div class="game-title">
+              DIGITAL KINGDOM
+            </div>
           </div>
 
           <div class="grade-hero-area">

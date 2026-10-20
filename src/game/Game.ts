@@ -18,9 +18,10 @@ import { CPUDash } from '../minigames/CPUDash'
 import { GameState } from '../progress/GameState'
 import { ECONOMY, GAMES } from '../progress/economy'
 import { KingdomPanels } from '../ui/KingdomPanels'
-import { questionsForGame } from '../content/topics'
+import { gameVisual } from '../progress/gameIcons'
 import { TypingGrandmaster } from '../minigames/TypingGrandmaster'
 import { FlappyFloppy } from '../minigames/FlappyFloppy'
+import { JumpUpTower } from '../minigames/JumpUpTower'
 
 import {
   createKingdomWorld,
@@ -69,6 +70,8 @@ export class Game {
   private typingGrandmasterActive = false
   private flappyActive = false
   private flappyFloppy: FlappyFloppy | null = null
+  private jumpTowerActive = false
+  private jumpUpTower: JumpUpTower | null = null
   private typingGrandmaster: TypingGrandmaster | null = null
 
   private currentWorld: WorldName = 'island'
@@ -96,16 +99,19 @@ export class Game {
     )
 
     this.renderer.setPixelRatio(
-      Math.min(window.devicePixelRatio, 2)
+      Math.min(window.devicePixelRatio, 1.5)
     )
 
-    this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    // ჩრდილები გამორთულია — წარმადობისთვის (ცის/შუქის ფერის ცვლილება საკმარისია)
+    this.renderer.shadowMap.enabled = false
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
 
     document.body.appendChild(this.renderer.domElement)
 
     const island = createWorld(this.scene)
+
+    // ნისლი გამორთულია (წარმადობა და სიცხადე)
+    this.scene.fog = null
 
     this.islandObjects = this.scene.children.filter(
       object => !(object instanceof THREE.Light)
@@ -140,6 +146,8 @@ export class Game {
         (object): object is THREE.DirectionalLight =>
           object instanceof THREE.DirectionalLight
       ) ?? null
+
+    if (this.sun) this.sun.castShadow = false
 
     const ambient = this.scene.children.find(
       (object): object is THREE.HemisphereLight =>
@@ -227,6 +235,7 @@ export class Game {
       font-family: Arial, sans-serif;
       font-size: 16px;
       font-weight: bold;
+      white-space: nowrap;
       pointer-events: none;
       box-shadow: 0 3px 14px rgba(0,0,0,0.15);
     `
@@ -240,6 +249,10 @@ export class Game {
 
     window.addEventListener('keydown', this.onKeyDown)
     window.addEventListener('resize', this.onResize)
+
+    // ზედა პანელების განლაგება — მხოლოდ მაშინ, როცა ყველა ელემენტი უკვე შექმნილია
+    this.layoutHud()
+    document.fonts?.ready.then(() => this.layoutHud())
 
     this.animate()
   }
@@ -305,24 +318,6 @@ export class Game {
       `🏰 ციფრული სამეფოს ეზო • ${icons[this.cycle.phase]} ${this.lastTimeLabel}`
   }
 
-  // სამეფოს გარშემო უფრო დიდ ფართობზე უნდა ჩანდეს ჩრდილები
-  private setShadowRange(range: number, mapSize: number) {
-    if (!this.sun) return
-
-    const shadow = this.sun.shadow
-    shadow.camera.left = -range
-    shadow.camera.right = range
-    shadow.camera.top = range
-    shadow.camera.bottom = -range
-    shadow.camera.updateProjectionMatrix()
-
-    if (shadow.mapSize.x !== mapSize) {
-      shadow.mapSize.set(mapSize, mapSize)
-      shadow.map?.dispose()
-      shadow.map = null
-    }
-  }
-
   private distanceTo(x: number, z: number) {
     const position = this.player.group.position
     return Math.hypot(position.x - x, position.z - z)
@@ -330,11 +325,43 @@ export class Game {
 
   // სამჭედლო და მისი თამაშები მესამე და მეოთხე კლასისთვის ირთვება
   private miniGameActive(): boolean {
-    return this.cpuDashActive || this.typingGrandmasterActive || this.flappyActive
+    return (
+      this.cpuDashActive ||
+      this.typingGrandmasterActive ||
+      this.flappyActive ||
+      this.jumpTowerActive
+    )
   }
 
+  // სამჭედლო და მისი თამაშები მესამე და მეოთხე კლასისთვის ირთვება
   private forgeEnabled(): boolean {
     return this.grade === 3 || this.grade === 4
+  }
+
+  /**
+   * ზედა პანელები ერთმანეთს არ ეხვევა: მონეტა/წიგნების პანელი ვარსკვლავების პანელის ქვეშ დგება,
+   * ადგილის წარწერა კი სათაურის ქვეშ. ზომებს რეალურად ვზომავთ, ამიტომ სტილის ფაილზე არ არის დამოკიდებული.
+   */
+  private layoutHud() {
+    if (!this.hud || !this.locationLabel) return
+
+    const title = document.querySelector('.game-ui .title') as HTMLElement | null
+    const stars = document.querySelector('.game-ui .stars') as HTMLElement | null
+
+    if (title) {
+      const rect = title.getBoundingClientRect()
+      if (rect.height > 0) {
+        this.locationLabel.style.top = `${Math.round(rect.bottom + 8)}px`
+      }
+    }
+
+    if (stars) {
+      const rect = stars.getBoundingClientRect()
+      if (rect.height > 0) {
+        this.hud.style.top = `${Math.round(rect.bottom + 8)}px`
+        this.hud.style.right = `${Math.max(12, Math.round(window.innerWidth - rect.right))}px`
+      }
+    }
   }
 
   private updateHud() {
@@ -520,6 +547,9 @@ export class Game {
     this.interactionPrompt.style.display = 'none'
     this.currentInteraction = null
 
+    // მისალმების ტექსტი ერთ სესიაში მხოლოდ პირველ მისვლაზე ჩანს
+    this.state.markForgeIntroSeen()
+
     const overlay = this.createModalOverlay()
     const card = this.createModalCard()
 
@@ -599,24 +629,24 @@ export class Game {
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
 
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+
     const overlay = this.createModalOverlay()
     const card = this.createModalCard()
-
-    const icon = document.createElement('div')
-    icon.textContent = '🕹️'
-    icon.style.cssText = 'font-size: 48px; margin-bottom: 6px;'
+    card.style.maxWidth = 'min(860px, 96vw)'
 
     const title = document.createElement('h1')
-    title.textContent = 'აირჩიე შენი გამოწვევა!'
+    title.textContent = '⚒️ სამჭედლო'
     title.style.cssText = `
-      margin: 0 0 8px;
-      font-size: clamp(24px, 4vw, 34px);
-      color: #315b88;
+      margin: 0 0 6px;
+      font-size: clamp(26px, 4vw, 36px);
+      color: #784323;
     `
 
     const subtitle = document.createElement('p')
     subtitle.textContent =
-      `თამაშის გასახსნელად ${ECONOMY.BOOKS_PER_GAME} 📘 გჭირდება. წიგნებს აკადემიაში ან მაღაზიაში მიიღებ.`
+      `აირჩიე თამაში. ფასიანი თამაშის გასახსნელად ${ECONOMY.BOOKS_PER_GAME} 📘 გჭირდება.`
     subtitle.style.cssText = `
       margin: 0 0 14px;
       color: #536579;
@@ -627,7 +657,7 @@ export class Game {
     balance.textContent = `🪙 ${this.state.coins}      📘 ${this.state.books}`
     balance.style.cssText = `
       display: inline-block;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
       padding: 8px 18px;
       border-radius: 999px;
       background: rgba(255,255,255,0.85);
@@ -639,8 +669,8 @@ export class Game {
     const list = document.createElement('div')
     list.style.cssText = `
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
       text-align: left;
     `
 
@@ -648,64 +678,111 @@ export class Game {
       const unlocked = game.free || this.state.isGameUnlocked(game.id)
       const playable = game.available && unlocked
       const buyable = game.available && !unlocked
+      const visual = gameVisual(game.id)
 
       const item = document.createElement('div')
-
       item.style.cssText = `
         display: flex;
         align-items: center;
-        gap: 12px;
-        padding: 15px;
-        border: 1px solid #d1dfeb;
-        border-radius: 14px;
-        background: rgba(255,255,255,0.8);
+        gap: 14px;
+        padding: 14px;
+        border: 2px solid #d1dfeb;
+        border-radius: 20px;
+        background: rgba(255,255,255,0.85);
         color: #26364a;
-        font-size: 15px;
-        font-weight: bold;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
       `
 
-      const gameIcon = document.createElement('span')
-      gameIcon.textContent = game.icon
-      gameIcon.style.fontSize = '27px'
+      // ხატულა: ფერადი ფილა თამაშის სახით
+      const tile = document.createElement('div')
+      tile.innerHTML = visual.svg
+      tile.style.cssText = `
+        position: relative;
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 76px;
+        height: 76px;
+        border-radius: 22px;
+        background: linear-gradient(145deg, ${visual.colors[0]}, ${visual.colors[1]});
+        box-shadow: 0 6px 14px rgba(30, 60, 90, 0.22), inset 0 2px 0 rgba(255,255,255,0.45);
+        ${game.available ? '' : 'filter: grayscale(0.85) brightness(1.05); opacity: 0.8;'}
+      `
+      const svgEl = tile.querySelector('svg')
+      if (svgEl) {
+        svgEl.setAttribute('width', '56')
+        svgEl.setAttribute('height', '56')
+      }
+
+      if (buyable) {
+        const lock = document.createElement('span')
+        lock.textContent = '🔒'
+        lock.style.cssText = `
+          position: absolute;
+          right: -6px;
+          bottom: -6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: #fff3d6;
+          border: 2px solid #e0a030;
+          font-size: 14px;
+        `
+        tile.appendChild(lock)
+      }
 
       const details = document.createElement('div')
-      details.style.cssText = 'display: flex; flex-direction: column; gap: 5px;'
+      details.style.cssText = 'display: flex; flex-direction: column; gap: 8px; min-width: 0;'
 
       const name = document.createElement('span')
       name.textContent = game.name
+      name.style.cssText = 'font-size: 18px; font-weight: 800; line-height: 1.2;'
 
-      const status = document.createElement('small')
+      const status = document.createElement('span')
       status.textContent = playable
         ? game.free
-          ? '▶ თამაში (უფასო)'
+          ? '▶ უფასო თამაში'
           : '▶ თამაში'
         : buyable
-          ? `🔒 გახსნა — ${ECONOMY.BOOKS_PER_GAME} 📘`
+          ? `🔓 გახსნა — ${ECONOMY.BOOKS_PER_GAME} 📘`
           : 'მალე დაემატება'
+      const pillColors = playable
+        ? 'background: #def7e6; color: #17703d; border: 1px solid #8fd3a8;'
+        : buyable
+          ? 'background: #fff0cf; color: #9a5a00; border: 1px solid #e8bb66;'
+          : 'background: #eceff3; color: #6a7a8c; border: 1px solid #d3dae2;'
       status.style.cssText = `
-        color: ${playable ? '#18834a' : buyable ? '#b36b00' : '#718197'};
-        font-size: 12px;
-        font-weight: normal;
+        align-self: flex-start;
+        padding: 4px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 800;
+        ${pillColors}
       `
 
       details.append(name, status)
-      item.append(gameIcon, details)
+      item.append(tile, details)
 
       if (playable || buyable) {
         item.style.cursor = 'pointer'
-        item.style.border = playable ? '2px solid #38a169' : '2px solid #e0a030'
+        item.style.borderColor = playable ? '#4cb877' : '#e0a030'
         item.style.background = playable
           ? 'linear-gradient(135deg, #f0fff4, #ffffff)'
-          : 'linear-gradient(135deg, #fff7e6, #ffffff)'
+          : 'linear-gradient(135deg, #fff8e8, #ffffff)'
         item.setAttribute('role', 'button')
         item.tabIndex = 0
-        item.setAttribute('aria-label', `${game.name}`)
+        item.setAttribute('aria-label', game.name)
 
         const handler = () => {
           if (playable) {
             if (game.id === 'cpu-dash') this.startCPUDash()
             if (game.id === 'typing-grandmaster') this.startTypingGrandmaster()
             if (game.id === 'flappy-floppy') this.startFlappyFloppy()
+            if (game.id === 'jump-up-tower') this.startJumpUpTower()
             return
           }
 
@@ -721,8 +798,8 @@ export class Game {
 
         item.addEventListener('click', handler)
         item.addEventListener('mouseenter', () => {
-          item.style.transform = 'translateY(-2px)'
-          item.style.boxShadow = '0 8px 18px rgba(25, 120, 70, 0.18)'
+          item.style.transform = 'translateY(-3px)'
+          item.style.boxShadow = '0 10px 22px rgba(30, 90, 70, 0.18)'
         })
         item.addEventListener('mouseleave', () => {
           item.style.transform = 'none'
@@ -735,7 +812,7 @@ export class Game {
           }
         })
       } else {
-        item.style.opacity = '0.78'
+        item.style.opacity = '0.85'
       }
 
       list.appendChild(item)
@@ -750,17 +827,13 @@ export class Game {
       font-weight: bold;
     `
 
-    const closeButton = this.createModalButton(
-      'დახურვა',
-      '#315b88'
-    )
-
+    const closeButton = this.createModalButton('დახურვა', '#315b88')
     closeButton.style.marginTop = '12px'
     closeButton.addEventListener('click', () => {
       this.closeForgeModal()
     })
 
-    card.append(icon, title, subtitle, balance, list, footer, closeButton)
+    card.append(title, subtitle, balance, list, footer, closeButton)
     overlay.appendChild(card)
     document.body.appendChild(overlay)
 
@@ -781,15 +854,7 @@ export class Game {
     this.cpuDashActive = true
     this.clock.getDelta()
 
-    // საკონტროლო კითხვები = აკადემიის იგივე კითხვები (თუ ამ კლასს თემა აქვს)
-    const gameQuestions = questionsForGame(
-      this.grade,
-      this.state.openedTopicIds(),
-      (topicId, questionId) => this.state.isSolved(topicId, questionId),
-    )
-
     this.cpuDash = new CPUDash({
-      questions: gameQuestions.length > 0 ? gameQuestions : undefined,
       onClose: () => {
         this.cpuDash = null
         this.cpuDashActive = false
@@ -854,6 +919,30 @@ export class Game {
     })
   }
 
+  private startJumpUpTower() {
+    if (!this.forgeEnabled() || this.jumpTowerActive) return
+    if (!this.state.isGameUnlocked('jump-up-tower')) return
+
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
+    this.forgeIntroOverlay?.remove()
+    this.forgeIntroOverlay = null
+
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+    this.jumpTowerActive = true
+    this.clock.getDelta()
+
+    this.jumpUpTower = new JumpUpTower({
+      onClose: () => {
+        this.jumpUpTower = null
+        this.jumpTowerActive = false
+        this.clock.getDelta()
+        this.updateInteractions()
+      },
+    })
+  }
+
   private closeForgeModal() {
     this.panels.close()
     this.forgeIntroOverlay?.remove()
@@ -875,7 +964,6 @@ export class Game {
 
     this.kingdom.group.visible = true
     this.cycle?.setEnabled(true)
-    this.setShadowRange(48, 4096)
 
     this.player.enterWorld(
       this.kingdomCollision,
@@ -894,7 +982,6 @@ export class Game {
     this.currentWorld = 'island'
     this.kingdom.group.visible = false
     this.cycle?.setEnabled(false)
-    this.setShadowRange(25, 2048)
 
     for (const object of this.islandObjects) {
       object.visible = true
@@ -984,7 +1071,12 @@ export class Game {
       const building = this.currentInteraction.building
 
       if (building.id === 'forge') {
-        if (this.forgeEnabled()) {
+        if (!this.forgeEnabled()) return
+
+        // პირველ მისვლაზე მისალმების ტექსტი, შემდეგ — პირდაპირ თამაშების არჩევანი
+        if (this.state.forgeIntroSeen) {
+          this.showForgeGames()
+        } else {
           this.showForgeIntro()
         }
         return
@@ -1092,6 +1184,7 @@ export class Game {
   }
 
   private onResize = () => {
+    this.layoutHud()
     this.renderer.setSize(
       window.innerWidth,
       window.innerHeight

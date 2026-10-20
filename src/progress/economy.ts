@@ -29,6 +29,6 @@ export const GAMES: GameInfo[] = [
   { id: 'ping-pong-dong', name: 'Ping-Pong-Dong', icon: '🏓', free: false, available: false },
   { id: 'cliff-climber', name: 'Cliff Climber', icon: '🧗', free: false, available: false },
   { id: 'flappy-floppy', name: 'Flappy Floppy', icon: '💾', free: false, available: true },
-  { id: 'jump-up-tower', name: 'Jump Up Tower', icon: '🗼', free: false, available: false },
+  { id: 'jump-up-tower', name: 'Jump Up Tower', icon: '🗼', free: false, available: true },
   { id: 'typing-grandmaster', name: 'Typing Grandmaster', icon: '⌨️', free: true, available: true },
 ]

@@ -1,26 +1,5 @@
-export type CPUDashQuestion = {
-  prompt: string
-  answers: string[]
-  anyOf?: boolean
-  /** მინიშნება, რომელიც პასუხის შეცდომისას ჩანს */
-  hint?: string
-  /** საკუთარი შემოწმება (მაგ. აკადემიის იგივე წესებით); თუ არის, answers-ზე უპირატესია */
-  check?: (input: string) => boolean
-}
-
 export type CPUDashOptions = {
   onClose?: () => void
-  /** თუ გადაეცემა, ბანკის მაგივრად ეს კითხვები გამოიყენება (ბიბლიოთეკა/აკადემიის კითხვები) */
-  questions?: CPUDashQuestion[]
-}
-
-type Question = {
-  prompt: string
-  answers: string[]
-  hint?: string
-  check?: (input: string) => boolean
-  // true — მიიღება ჩამოთვლილი პასუხებიდან ნებისმიერი (ან რამდენიმე მათგანი ერთად)
-  anyOf?: boolean
 }
 
 type ObstacleKind =
@@ -84,7 +63,7 @@ type Theme = 'chip' | 'data' | 'core' | 'city' | 'virus' | 'ocean' | 'tunnel' | 
 type ChunkKind =
   | 'plain'
   | 'triple'
-  | 'pad'
+  | 'padHigh'
   | 'padWall'
   | 'bridge'
   | 'bridgeWall'
@@ -127,46 +106,6 @@ type LevelConfig = {
   features: Features
 }
 
-const QUESTION_BANK: Question[] = [
-  {
-    prompt: 'ვინ იყო პირველი პროგრამისტი ადამიანი?',
-    answers: ['ადა ლავლეისი', 'ada lovelace'],
-  },
-  {
-    prompt: 'რომელი კომპიუტერის ნაწილი ამუშავებს ინფორმაციას?',
-    answers: ['პროცესორი', 'cpu'],
-  },
-  {
-    prompt: 'დინამიკები ინფორმაციის შემტანი მოწყობილობაა თუ გამომტანი?',
-    answers: ['გამომტანი', 'გამომტანი მოწყობილობა'],
-  },
-  {
-    prompt: 'რა ქვია შეცდომას პროგრამირებაში?',
-    answers: ['bug', 'ბაგი'],
-  },
-  {
-    prompt: 'რომელი ნაწილი ინახავს მეხსიერებას?',
-    answers: ['hdd', 'ვინჩესტერი', 'მყარი დისკი'],
-  },
-  {
-    prompt: 'რომელ ნაწილს ავიწყდება ყველაფერი გათიშვის მერე?',
-    answers: ['ram', 'ოპერატიული', 'ოპერატიული მეხსიერება'],
-  },
-  {
-    prompt: 'რამდენი სიმბოლო უნდა იყოს პაროლი, როდესაც ვქმნით ახალს?',
-    answers: ['რვა', '8', 'რვა სიმბოლო', '8 სიმბოლო'],
-  },
-  {
-    prompt: 'ვის უნდა გავუზიაროთ ჩვენი პაროლი?',
-    answers: ['არავის'],
-  },
-  {
-    prompt: 'როგორი შეცდომა ან შეცდომები იცი პროგრამირებაში?',
-    answers: ['სინტაქსური', 'ლოგიკური', 'სტილისტიკური'],
-    anyOf: true,
-  },
-]
-
 // ერთი ეტაპის სიგრძე მეტრებში
 // ეტაპის სიგრძე მეტრებში: პირველი 2000 მ, ყოველ შემდეგს +150 მ; მე-9 ეტაპის შემდეგ აღარ იზრდება
 const LEVEL_LENGTH_BASE = 2000
@@ -181,6 +120,10 @@ function levelLengthFor(levelIndex: number): number {
 const ZOOM = 1.3
 const TAU = Math.PI * 2
 
+// ნათება (shadowBlur) ძალიან მძიმეა სუსტ კომპიუტერებზე. true-ზე დააყენე, თუ ლამაზი ნათება გინდა.
+const GLOW = false
+const fxBlur = (n: number): number => (GLOW ? n : 0)
+
 // რაკეტის ეტაპი (მე-7): ფიზიკა და ზომები
 const ROCKET = {
   climb: 260, // ასვლის სიჩქარე, როცა ღილაკი დაჭერილია
@@ -193,13 +136,16 @@ const ROCKET = {
 
 // რთული ნაკრებების წინ დამატებითი დრო (წამებში) — წინა დაბრკოლების გადალახვის შემდეგ მოსამზადებლად
 const CHUNK_LEAD: Partial<Record<ChunkKind, number>> = {
-  bridgeWall: 0.3,
-  padWall: 0.3,
+  bridge: 0.2,
+  bridgeWall: 0.25,
+  padHigh: 0.2,
+  padWall: 0.25,
+  drop: 0.1,
   saw: 0.25,
   drone: 0.12,
   triple: 0.08,
   pit: 0.15,
-  pitBridge: 0.2,
+  pitBridge: 0.15,
 }
 const DROP_SPEED = 1500
 
@@ -237,37 +183,46 @@ const LEVELS: LevelConfig[] = [
   {
     name: 'ეტაპი 2 — მონაცემთა ნაკადი',
     speed: 450,
-    gapMin: 270,
-    gapMax: 390,
-    obstacleChance: 0.78,
+    gapMin: 255,
+    gapMax: 320,
+    obstacleChance: 0.85,
     color: '#ff4fd8',
     background: '#1d0833',
     accent: '#ff0844',
     theme: 'data',
     sky: ['#1d0833', '#080816', '#02040a'],
     tip: '',
-    features: { ...NO_FEATURES, bridge: 0.35 },
+    features: {
+      ...NO_FEATURES,
+      bridge: 0.22,
+    },
   },
   {
     name: 'ეტაპი 3 — პროცესორის ბირთვი',
     speed: 540,
-    gapMin: 270,
-    gapMax: 390,
-    obstacleChance: 0.88,
+    gapMin: 235,
+    gapMax: 295,
+    obstacleChance: 0.95,
     color: '#ffb83f',
     background: '#2b0a12',
     accent: '#f77062',
     theme: 'core',
     sky: ['#2b0a12', '#080816', '#02040a'],
     tip: '',
-    features: { ...NO_FEATURES, superBridge: 0.22, bridge: 0.22, bridgeHazard: true, double: 0.25, pit: 0.12 },
+    features: {
+      ...NO_FEATURES,
+      superBridge: 0.1,
+      bridge: 0.14,
+      double: 0.28,
+      pit: 0.12,
+    },
   },
   {
     name: 'ეტაპი 4 — ქსელის ქალაქი',
     speed: 575,
-    gapMin: 250,
-    gapMax: 360,
-    obstacleChance: 0.9,
+    gapMin: 225,
+    gapMax: 275,
+    obstacleChance: 1,
     color: '#5ef2c3',
     background: '#06203a',
     accent: '#3d9bff',
@@ -277,22 +232,22 @@ const LEVELS: LevelConfig[] = [
     features: {
       ...NO_FEATURES,
       superBridge: 0.1,
-      bridge: 0.16,
+      bridge: 0.12,
       bridgeHazard: true,
-      wall: 0.14,
-      drone: 0.12,
+      wall: 0.1,
+      drone: 0.1,
       droneCombo: 0.5,
       double: 0.3,
-      pit: 0.12,
-      pitBridge: 0.06,
+      pit: 0.08,
+      pitBridge: 0.08,
     },
   },
   {
     name: 'ეტაპი 5 — ვირუსის ზონა',
     speed: 605,
-    gapMin: 245,
-    gapMax: 350,
-    obstacleChance: 0.92,
+    gapMin: 222,
+    gapMax: 268,
+    obstacleChance: 1,
     color: '#8dff4f',
     background: '#1a0a1f',
     accent: '#ff2d55',
@@ -302,24 +257,24 @@ const LEVELS: LevelConfig[] = [
     features: {
       ...NO_FEATURES,
       superBridge: 0.1,
-      bridge: 0.14,
+      bridge: 0.1,
       bridgeHazard: true,
-      wall: 0.14,
-      drone: 0.12,
+      wall: 0.1,
+      drone: 0.1,
       droneCombo: 0.55,
       drop: 0.1,
       double: 0.3,
       triple: 0.12,
-      pit: 0.1,
-      pitBridge: 0.1,
+      pit: 0.08,
+      pitBridge: 0.08,
     },
   },
   {
     name: 'ეტაპი 6 — მეხსიერების ოკეანე',
     speed: 635,
-    gapMin: 245,
-    gapMax: 345,
-    obstacleChance: 0.93,
+    gapMin: 225,
+    gapMax: 265,
+    obstacleChance: 1,
     color: '#4fc3ff',
     background: '#031b3a',
     accent: '#00e0c6',
@@ -328,19 +283,19 @@ const LEVELS: LevelConfig[] = [
     tip: 'ახალი: მოძრავი ხერხები და ტივტივა დრონები',
     features: {
       ...NO_FEATURES,
-      superBridge: 0.1,
-      bridge: 0.12,
+      superBridge: 0.09,
+      bridge: 0.09,
       bridgeHazard: true,
-      wall: 0.14,
-      drone: 0.12,
+      wall: 0.1,
+      drone: 0.1,
       droneCombo: 0.6,
       bob: true,
-      drop: 0.1,
+      drop: 0.09,
       saw: 0.1,
       double: 0.32,
-      triple: 0.15,
+      triple: 0.14,
       pit: 0.08,
-      pitBridge: 0.12,
+      pitBridge: 0.08,
     },
   },
   {
@@ -376,9 +331,9 @@ const LEVELS: LevelConfig[] = [
   {
     name: 'ეტაპი 8 — სერვერების ბნელი ოთახი',
     speed: 695,
-    gapMin: 250,
-    gapMax: 340,
-    obstacleChance: 0.95,
+    gapMin: 236,
+    gapMax: 270,
+    obstacleChance: 1,
     color: '#ffd34f',
     background: '#1d1405',
     accent: '#ff7a3d',
@@ -387,27 +342,27 @@ const LEVELS: LevelConfig[] = [
     tip: 'ყველა სახის დაბრკოლება ერთად — არ დაიძინო!',
     features: {
       ...NO_FEATURES,
-      superBridge: 0.1,
-      bridge: 0.11,
+      superBridge: 0.09,
+      bridge: 0.09,
       bridgeHazard: true,
-      wall: 0.16,
-      drone: 0.12,
+      wall: 0.1,
+      drone: 0.1,
       droneCombo: 0.65,
       bob: true,
-      drop: 0.12,
-      saw: 0.12,
+      drop: 0.1,
+      saw: 0.1,
       double: 0.35,
-      triple: 0.18,
-      pit: 0.08,
-      pitBridge: 0.14,
+      triple: 0.16,
+      pit: 0.07,
+      pitBridge: 0.09,
     },
   },
   {
     name: 'ეტაპი 9 — ციფრული ქარიშხალი',
     speed: 730,
-    gapMin: 262,
-    gapMax: 345,
-    obstacleChance: 0.96,
+    gapMin: 250,
+    gapMax: 280,
+    obstacleChance: 1,
     color: '#7df9ff',
     background: '#0b0b1f',
     accent: '#ffeb3b',
@@ -416,19 +371,19 @@ const LEVELS: LevelConfig[] = [
     tip: 'ფინალი! ქარიშხალი, ელვა და ყველაზე სწრაფი ტემპი',
     features: {
       ...NO_FEATURES,
-      superBridge: 0.1,
-      bridge: 0.1,
+      superBridge: 0.09,
+      bridge: 0.08,
       bridgeHazard: true,
-      wall: 0.17,
-      drone: 0.12,
+      wall: 0.1,
+      drone: 0.1,
       droneCombo: 0.7,
       bob: true,
-      drop: 0.13,
-      saw: 0.13,
+      drop: 0.1,
+      saw: 0.11,
       double: 0.36,
-      triple: 0.2,
-      pit: 0.08,
-      pitBridge: 0.16,
+      triple: 0.18,
+      pit: 0.07,
+      pitBridge: 0.1,
     },
   },
 ]
@@ -489,16 +444,14 @@ export class CPUDash {
   private rocketVY = 0
   private rocketGrace = 0
   private levelTime = 0
+  private skyGradient: CanvasGradient | null = null
+  private skyKey = ''
   private rocketObs: RocketObstacle[] = []
   private nextRocketWx = 0
   private lastRocketPass = 0
-  private questionOpen = false
-  private lastQuestion = -1
-  private currentQuestionIndex = -1
-  private readonly bank: Question[]
+  private modalOpen = false
   private fallingIntoPit = false
   private fallTimer = 0
-  private readonly answeredQuestionIndices = new Set<number>()
   private flash = 0
   private levelIntroUntil = 0
   private finishSpawned = false
@@ -532,7 +485,7 @@ export class CPUDash {
       event.code === 'KeyW'
     ) {
       event.preventDefault()
-      if (!this.questionOpen && this.running) {
+      if (!this.modalOpen && this.running) {
         this.jumpQueued = true
         this.jumpHeld = true
       }
@@ -554,14 +507,13 @@ export class CPUDash {
     const target = event.target as HTMLElement | null
     if (target?.closest('button, input')) return
 
-    if (!this.questionOpen && this.running) {
+    if (!this.modalOpen && this.running) {
       this.jumpQueued = true
       this.jumpHeld = true
     }
   }
 
   constructor(options: CPUDashOptions = {}) {
-    this.bank = options.questions && options.questions.length > 0 ? options.questions : QUESTION_BANK
     this.onClose = options.onClose
     this.createInterface()
     this.initMeteors()
@@ -897,7 +849,7 @@ export class CPUDash {
   private resize() {
     if (!this.canvas || !this.root) return
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.25)
     const width = window.innerWidth
     const height = window.innerHeight
 
@@ -910,12 +862,9 @@ export class CPUDash {
     this.levelIndex = 0
     this.distance = 0
     this.score = 0
-    this.lastQuestion = -1
-    this.currentQuestionIndex = -1
     this.tipShownFor = -1
-    this.answeredQuestionIndices.clear()
     this.running = true
-    this.questionOpen = false
+    this.modalOpen = false
     this.resetLevel()
     this.lastTime = performance.now()
     this.frame = requestAnimationFrame(this.loop)
@@ -999,7 +948,7 @@ export class CPUDash {
 
     this.updateAmbient(delta)
 
-    if (this.running && !this.questionOpen && now >= this.levelIntroUntil) {
+    if (this.running && !this.modalOpen && now >= this.levelIntroUntil) {
       const intro = this.root.querySelector('.cpu-level-intro') as HTMLDivElement | null
       if (intro && !intro.hidden) intro.hidden = true
       this.update(delta)
@@ -1425,6 +1374,24 @@ export class CPUDash {
     this.nextRocketWx = wx + obstacle.width + level.speed * (0.95 + dy / 210) + 90
   }
 
+  /** რამდენ პიქსელზე რჩება ჩვეულებრივი ხტომა 42 სიმაღლეზე მაღლა (გადასახტომი ველის მაქსიმალური სიგრძე) */
+  private normalJumpWindow(level: LevelConfig): number {
+    return 207 * Math.sqrt(level.speed / LEVELS[0].speed)
+  }
+
+  /**
+   * სუპერ-ხტომის ფრენა: პლატფორმის (70) ზემოდან აფრენისას რამდენ პიქსელში ეშვება გმირი
+   * მოცემული სიმაღლის (targetH) პლატფორმაზე
+   */
+  private superLanding(level: LevelConfig, targetH: number): number {
+    const ratio = level.speed / LEVELS[0].speed
+    const gravity = 1900 * ratio
+    const v = 690 * Math.sqrt(ratio) * 1.4
+    const disc = v * v - 2 * gravity * (targetH - 70)
+    const time = (v + Math.sqrt(Math.max(0, disc))) / gravity
+    return level.speed * time
+  }
+
   /** სუპერ-ხტომის ფრენის მანძილი (პიქსელი) პლატფორმის (70 სიმაღლის) ზემოდან ძირამდე */
   private superJumpFlight(level: LevelConfig): number {
     const ratio = level.speed / LEVELS[0].speed
@@ -1437,7 +1404,29 @@ export class CPUDash {
   // ---------- დაბრკოლებების ნაკრებები (chunks) ----------
   // ყოველი ნაკრები ისეა აგებული, რომ ერთი ან ორი ხტომით აუცილებლად გადალახვადი იყოს
 
+  /** დაბრკოლებებს შორის დამატებითი მანძილების მასშტაბი: მაღალ ეტაპებზე უფრო ხშირი დაბრკოლებები */
+  private spacingScale(level: LevelConfig): number {
+    const index = LEVELS.indexOf(level)
+    return index >= 3 ? Math.max(0.68, 0.86 - (index - 3) * 0.035) : 1
+  }
+
+  /** ნაკრების წინ დამატებითი მანძილი (პიქსელი) */
+  private chunkLead(kind: ChunkKind, level: LevelConfig): number {
+    return (CHUNK_LEAD[kind] || 0) * level.speed * this.spacingScale(level)
+  }
+
   private buildChunk(
+    kind: ChunkKind,
+    x: number,
+    level: LevelConfig,
+  ): { length: number; extraGap: number } {
+    const raw = this.buildChunkRaw(kind, x, level)
+    // სუპერ-ხტომის ნაკრებები მკაცრად გაანგარიშებულია (დაშვების ზონა), მათ არ ვამცირებთ
+    const keep = kind === 'padWall' || kind === 'padHigh'
+    return { length: raw.length, extraGap: keep ? raw.extraGap : raw.extraGap * this.spacingScale(level) }
+  }
+
+  private buildChunkRaw(
     kind: ChunkKind,
     x: number,
     level: LevelConfig,
@@ -1448,12 +1437,6 @@ export class CPUDash {
     const pX = this.playerX()
 
     switch (kind) {
-      case 'pad': {
-        // სუპერ-ხტომა დამხმარეა: მის შემდეგ ფრენისა და დაშვების ზონა სუფთაა
-        this.obstacles.push({ x, width: 150, height: 70, kind: 'super_bridge' })
-        return { length: 150, extraGap: this.superJumpFlight(level) + speed * 0.25 }
-      }
-
       case 'padWall': {
         // სუპერ-ხტომის პლატფორმა + ძალიან მაღალი ბარიერი — მხოლოდ სუპერ-ხტომით გადადიხარ
         this.obstacles.push({ x, width: 150, height: 70, kind: 'super_bridge' })
@@ -1463,35 +1446,66 @@ export class CPUDash {
           height: 190 + Math.random() * 25,
           kind: 'wall',
         })
-        return { length: 150 + 135 + 40, extraGap: this.superJumpFlight(level) + speed * 0.25 }
+        // შემდეგი დაბრკოლება მხოლოდ დაშვების ზონის შემდეგ იწყება (ხაფანგი არ უნდა იყოს)
+        const wallChunk = 150 + 135 + 40
+        const extra = 150 + this.superJumpFlight(level) + speed * 0.38 - wallChunk - level.gapMin
+        return { length: wallChunk, extraGap: Math.max(0, extra) }
+      }
+
+      case 'padHigh': {
+        // სუპერ-ხტომის პლატფორმა + მაღალი ხიდი (150) ფართო ორმოზე — მხოლოდ სუპერ-ხტომით ადიხარ
+        const platH = 150
+        const landing = this.superLanding(level, platH)
+        const start = x + landing - 110
+        const runLen = 120 + Math.random() * 120
+        const platLen = 110 + 150 + 110 + runLen
+        this.obstacles.push({ x, width: 150, height: 70, kind: 'super_bridge' })
+        this.obstacles.push({ x: start, width: platLen, height: platH, kind: 'bridge' })
+        this.obstacles.push({ x: start + 35, width: platLen - 70, height: 0, kind: 'pit' })
+        return { length: start + platLen - x, extraGap: speed * 0.3 }
       }
 
       case 'bridge': {
-        const bridgeWidth = 210
+        // ხიდი ძირზე გრძელი დაბრკოლებების ველის თავზე — ჩვეულებრივი ხტომით გადასვლა შეუძლებელია
+        const fieldLen = this.normalJumpWindow(level) + 45 + Math.random() * 100
+        const overhang = 45
         const bridgeHeight = 82
-        this.obstacles.push({ x, width: bridgeWidth, height: bridgeHeight, kind: 'bridge' })
-        let length = bridgeWidth
+        this.obstacles.push({
+          x,
+          width: fieldLen + overhang * 2,
+          height: bridgeHeight,
+          kind: 'bridge',
+        })
 
-        if (f.bridgeHazard) {
-          if (Math.random() < 0.55) {
-            this.obstacles.push({
-              x: x + 85,
-              width: 32,
-              height: 38,
-              kind: 'spike',
-              yOffset: bridgeHeight,
-            })
-          } else {
-            this.obstacles.push({
-              x: x + bridgeWidth + 40,
-              width: 28,
-              height: 60,
-              kind: 'electric',
-            })
-            length = bridgeWidth + 40 + 28
-          }
+        // ველი: ეკლები (და ზოგჯერ ელექტრო სვეტები) ერთმანეთის გვერდით
+        const electricLevel = LEVELS.indexOf(level) >= 2
+        let px = x + overhang
+        let n = 0
+        while (px < x + overhang + fieldLen - 30) {
+          const electric = electricLevel && n % 3 === 2
+          const w = electric ? 25 : 34
+          this.obstacles.push({
+            x: px,
+            width: w,
+            height: electric ? 60 : 42,
+            kind: electric ? 'electric' : 'spike',
+          })
+          px += w + 20
+          n++
         }
-        return { length, extraGap: 0 }
+
+        // უფრო მაღალ ეტაპებზე ხიდზეც ზოგჯერ ეკალია — ხიდზე კიდევ ერთი ხტომა სჭირდება
+        if (f.bridgeHazard && LEVELS.indexOf(level) >= 3 && Math.random() < 0.3) {
+          this.obstacles.push({
+            x: x + overhang + fieldLen / 2,
+            width: 32,
+            height: 38,
+            kind: 'spike',
+            yOffset: bridgeHeight,
+          })
+        }
+
+        return { length: fieldLen + overhang * 2, extraGap: speed * 0.1 }
       }
 
       case 'bridgeWall': {
@@ -1555,7 +1569,7 @@ export class CPUDash {
           // ვიწრო ეკრანზე ჩამოვარდნისთვის ადგილი არ არის — ჩვეულებრივი ბლოკი
           this.obstacles.push({ x, width, height, kind: 'block' })
         }
-        return { length: width, extraGap: 0 }
+        return { length: width, extraGap: speed * 0.18 }
       }
 
       case 'saw': {
@@ -1577,7 +1591,9 @@ export class CPUDash {
       case 'pitBridge': {
         // ფართო ორმო, რომელზეც გადახტომა შეუძლებელია — ხიდზე უნდა ახტე და გადაირბინო
         const overlap = 60
-        const width = 230 + Math.random() * 90 + Math.max(0, LEVELS.indexOf(level) - 3) * 12
+        // ორმო ჩვეულებრივი ხტომის სრულ მანძილზე გრძელია — ხიდის გარეშე გადასვლა შეუძლებელია
+        const arc = 276 * Math.sqrt(level.speed / LEVELS[0].speed)
+        const width = arc + 40 + Math.random() * 90
         this.obstacles.push({ x: x + overlap, width, height: 0, kind: 'pit' })
         this.obstacles.push({ x, width: width + overlap * 2, height: 82, kind: 'bridge' })
         return { length: width + overlap * 2, extraGap: speed * 0.3 }
@@ -1646,7 +1662,7 @@ export class CPUDash {
     }
 
     if (hit(f.superBridge)) {
-      kind = f.wall > 0 && Math.random() < 0.55 ? 'padWall' : 'pad'
+      kind = this.levelIndex >= 3 && Math.random() < 0.5 ? 'padHigh' : 'padWall'
     } else if (hit(f.bridge)) {
       kind = 'bridge'
     } else if (hit(f.wall)) {
@@ -1663,13 +1679,13 @@ export class CPUDash {
       kind = 'pitBridge'
     } else {
       if (Math.random() > level.obstacleChance) {
-        this.nextObstacleX = spawnX + 110
+        this.nextObstacleX = spawnX + 60
         return
       }
       kind = f.triple > 0 && Math.random() < f.triple ? 'triple' : 'plain'
     }
 
-    const x = spawnX + (CHUNK_LEAD[kind] || 0) * level.speed
+    const x = spawnX + this.chunkLead(kind, level)
     const { length, extraGap } = this.buildChunk(kind, x, level)
     const gap = level.gapMin + Math.random() * (level.gapMax - level.gapMin)
     this.nextObstacleX = x + length + gap + extraGap
@@ -1711,11 +1727,16 @@ export class CPUDash {
       ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s)
     }
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, height)
-    gradient.addColorStop(0, level.sky[0])
-    gradient.addColorStop(0.6, level.sky[1])
-    gradient.addColorStop(1, level.sky[2])
-    ctx.fillStyle = gradient
+    const skyKey = `${this.levelIndex}:${Math.round(height)}`
+    if (this.skyKey !== skyKey || !this.skyGradient) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, height)
+      gradient.addColorStop(0, level.sky[0])
+      gradient.addColorStop(0.6, level.sky[1])
+      gradient.addColorStop(1, level.sky[2])
+      this.skyGradient = gradient
+      this.skyKey = skyKey
+    }
+    ctx.fillStyle = this.skyGradient
     ctx.fillRect(-20, -20, width + 40, height + 40)
 
     // თემატური დინამიური ფონი
@@ -1724,15 +1745,7 @@ export class CPUDash {
     for (const meteor of this.meteors) {
       ctx.save()
       ctx.globalAlpha = meteor.alpha
-      const mGrad = ctx.createLinearGradient(
-        meteor.x,
-        meteor.y,
-        meteor.x + meteor.length,
-        meteor.y - meteor.length * 0.45
-      )
-      mGrad.addColorStop(0, level.color)
-      mGrad.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.strokeStyle = mGrad
+      ctx.strokeStyle = rgba(level.color, 0.75)
       ctx.lineWidth = 2
       ctx.beginPath()
       ctx.moveTo(meteor.x, meteor.y)
@@ -1798,7 +1811,7 @@ export class CPUDash {
     ctx.strokeStyle = level.color
     ctx.lineWidth = 3
     ctx.shadowColor = level.color
-    ctx.shadowBlur = 16
+    ctx.shadowBlur = fxBlur(16)
     ctx.beginPath()
     let cursor = 0
     for (const pit of pits) {
@@ -1811,6 +1824,14 @@ export class CPUDash {
     if (cursor < width) {
       ctx.moveTo(cursor, ground)
       ctx.lineTo(width, ground)
+    }
+    if (!GLOW) {
+      // იაფი "ნათება": უფრო განიერი გამჭვირვალე ხაზი
+      ctx.save()
+      ctx.strokeStyle = rgba(level.color, 0.16)
+      ctx.lineWidth = 10
+      ctx.stroke()
+      ctx.restore()
     }
     ctx.stroke()
     ctx.shadowBlur = 0
@@ -1900,7 +1921,7 @@ export class CPUDash {
       ctx.strokeStyle = level.color
       ctx.lineWidth = 3
       ctx.shadowColor = level.color
-      ctx.shadowBlur = 14
+      ctx.shadowBlur = fxBlur(14)
       ctx.beginPath()
       for (let i = 0; i <= n; i++) {
         if (i === 0) ctx.moveTo(0, edge[0])
@@ -1933,7 +1954,7 @@ export class CPUDash {
       ctx.font = '700 20px Inter, system-ui, sans-serif'
       ctx.fillStyle = '#ffffff'
       ctx.shadowColor = level.color
-      ctx.shadowBlur = 12
+      ctx.shadowBlur = fxBlur(12)
       ctx.fillText('დაჭერა (SPACE / მაუსი) — ზემოთ   •   გაშვება — ქვემოთ', W / 2, H * 0.17)
       ctx.restore()
     }
@@ -1971,7 +1992,7 @@ export class CPUDash {
         ctx.strokeStyle = level.color
         ctx.lineWidth = 2
         ctx.shadowColor = level.color
-        ctx.shadowBlur = 10
+        ctx.shadowBlur = fxBlur(10)
         ctx.strokeRect(sx, -4, o.width, topEdge + 4)
         ctx.strokeRect(sx, bottomEdge, o.width, H - bottomEdge + 4)
         ctx.restore()
@@ -1990,7 +2011,7 @@ export class CPUDash {
         ctx.strokeStyle = '#ff9aaa'
         ctx.lineWidth = 2
         ctx.shadowColor = '#ff4d6d'
-        ctx.shadowBlur = 12
+        ctx.shadowBlur = fxBlur(12)
         ctx.beginPath()
         ctx.moveTo(sx, baseY)
         ctx.lineTo(sx + o.width, baseY)
@@ -2079,7 +2100,7 @@ export class CPUDash {
 
     // კორპუსი
     ctx.shadowColor = level.color
-    ctx.shadowBlur = 14
+    ctx.shadowBlur = fxBlur(14)
     ctx.fillStyle = '#e8f4ff'
     ctx.beginPath()
     ctx.moveTo(0, -11)
@@ -2226,16 +2247,16 @@ export class CPUDash {
 
     ctx.save()
     ctx.font = '14px ui-monospace, Menlo, monospace'
-    const colW = 34
+    const colW = 48
     const cols = Math.ceil(W / colW) + 1
     for (let c = 0; c < cols; c++) {
       const x = c * colW + 6 - mod(this.scroll * 0.05, colW)
       const sp = 40 + hash(c) * 90
       const head = mod(t * sp + hash(c + 50) * G * 2, G + 200) - 100
-      for (let k = 0; k < 9; k++) {
-        const y = head - k * 17
+      for (let k = 0; k < 6; k++) {
+        const y = head - k * 20
         if (y < 0 || y > G) continue
-        ctx.fillStyle = k === 0 ? 'rgba(255,255,255,0.55)' : rgba(level.color, (1 - k / 9) * 0.35)
+        ctx.fillStyle = k === 0 ? 'rgba(255,255,255,0.55)' : rgba(level.color, (1 - k / 6) * 0.35)
         ctx.fillText(hash(c * 31 + k + Math.floor(t * 3 + c)) > 0.5 ? '1' : '0', x, y)
       }
     }
@@ -2362,7 +2383,7 @@ export class CPUDash {
 
       for (let r = 0; r < Math.floor(bh / 18); r++) {
         for (let c = 0; c < 4; c++) {
-          const lit = hash(id * 13 + r * 7 + c) > 0.55
+          const lit = hash(id * 13 + r * 7 + c) > 0.72
           if (!lit) continue
           const blink = 0.5 + 0.5 * Math.sin(t * (0.6 + hash(id + r)) + r + c)
           ctx.fillStyle = rgba(level.color, 0.2 + 0.5 * blink)
@@ -2566,6 +2587,7 @@ export class CPUDash {
         ctx.lineWidth = 1
         ctx.strokeRect(x, y, w, h)
         for (let r = 0; r < Math.floor(h / 14); r++) {
+          if (alpha < 0.5 && r % 3 !== 0) continue
           const on = Math.sin(t * (1 + hash(id + r)) * 2 + r + id) > -0.2
           if (!on) continue
           ctx.fillStyle = rgba(ledColors[Math.floor(hash(id * 7 + r) * 3)], 0.3 + 0.6 * alpha)
@@ -2633,7 +2655,7 @@ export class CPUDash {
       ctx.strokeStyle = '#ffffff'
       ctx.lineWidth = 3
       ctx.shadowColor = level.color
-      ctx.shadowBlur = 20
+      ctx.shadowBlur = fxBlur(20)
       ctx.beginPath()
       let bx = W * (0.2 + hash(idx) * 0.7)
       let by = 0
@@ -2665,8 +2687,14 @@ export class CPUDash {
     const top = y + bob
 
     ctx.save()
+    if (!GLOW) {
+      ctx.fillStyle = rgba(glow, 0.16)
+      ctx.beginPath()
+      ctx.arc(x + size / 2, top + size / 2, size * 0.85, 0, Math.PI * 2)
+      ctx.fill()
+    }
     ctx.shadowColor = glow
-    ctx.shadowBlur = 22
+    ctx.shadowBlur = fxBlur(22)
 
     const gradient = ctx.createLinearGradient(x, top, x + size, top + size)
     gradient.addColorStop(0, '#f7ffff')
@@ -2715,7 +2743,7 @@ export class CPUDash {
 
     if (obstacle.kind === 'finish') {
       ctx.shadowColor = '#00ffcc'
-      ctx.shadowBlur = 25
+      ctx.shadowBlur = fxBlur(25)
 
       ctx.fillStyle = '#00ffcc'
       ctx.fillRect(x, ground - 180, 10, 180)
@@ -2742,7 +2770,7 @@ export class CPUDash {
     }
 
     ctx.shadowColor = obstacle.kind === 'electric' ? '#ff4fd8' : glow
-    ctx.shadowBlur = 14
+    ctx.shadowBlur = fxBlur(14)
 
     if (obstacle.kind === 'bridge') {
       const top = ground - obstacle.height
@@ -2769,7 +2797,7 @@ export class CPUDash {
       ctx.fillStyle = '#ffffa0'
       ctx.fillRect(x, top, obstacle.width, 4)
       ctx.shadowColor = '#ffaa00'
-      ctx.shadowBlur = 18
+      ctx.shadowBlur = fxBlur(18)
       ctx.fillStyle = '#ffffff'
       ctx.font = 'bold 11px monospace'
       ctx.fillText('⚡ SUPER JUMP ⚡', x + 18, top - 6)
@@ -2869,7 +2897,7 @@ export class CPUDash {
         ctx.fillText('!', wx, ground - 10)
         ctx.textAlign = 'start'
         ctx.shadowColor = '#ff7a3d'
-        ctx.shadowBlur = 24
+        ctx.shadowBlur = fxBlur(24)
       }
       ctx.fillStyle = '#5a3a2a'
       ctx.fillRect(x, y, obstacle.width, obstacle.height)
@@ -2931,90 +2959,40 @@ export class CPUDash {
 
   private finishLevel() {
     this.running = false
-    this.questionOpen = true
+    this.modalOpen = true
 
     if (this.levelIndex >= LEVELS.length - 1) {
       this.showVictory()
       return
     }
 
-    this.showQuestion()
+    this.showLevelComplete()
   }
 
-  private showQuestion() {
-    const questionIndex = this.pickQuestion()
-    this.currentQuestionIndex = questionIndex
-    const question = this.bank[questionIndex]
+  /** ეტაპი გავლილია: მცირე პაუზა და გადასვლა შემდეგ ეტაპზე (საკონტროლო კითხვის გარეშე) */
+  private showLevelComplete() {
     const modal = this.root.querySelector('.cpu-modal') as HTMLDivElement
-
     modal.hidden = false
     modal.innerHTML = `
       <div class="cpu-card">
-        <div class="cpu-card-icon">🧠</div>
-        <h2>ციფრული ცოდნის შემოწმება</h2>
-        <p>${question.prompt}</p>
-        <form>
-          <input
-            class="cpu-answer"
-            type="text"
-            autocomplete="off"
-            autocapitalize="none"
-            spellcheck="false"
-            aria-label="შეიყვანე პასუხი"
-            placeholder="ჩაწერე პასუხი..."
-            required
-          />
-          <button class="cpu-submit" type="submit">პასუხის შემოწმება →</button>
-          <div class="cpu-feedback" aria-live="polite"></div>
-        </form>
-        <div class="cpu-small">პასუხი თავად აკრიფე — ვარიანტები არ არის.</div>
+        <div class="cpu-card-icon">✅</div>
+        <h2>ეტაპი ${this.levelIndex + 1} გავლილია!</h2>
+        <p>შესანიშნავია! შემდეგი ეტაპი უფრო სწრაფია.</p>
+        <button class="cpu-submit" type="button">შემდეგი ეტაპი →</button>
       </div>
     `
 
-    const form = modal.querySelector('form')!
-    const input = modal.querySelector('input')!
-    const feedback = modal.querySelector('.cpu-feedback')!
-
-    form.addEventListener('submit', event => {
-      event.preventDefault()
-      const answer = this.normalize(input.value)
-
-      if (!answer) {
-        feedback.textContent = 'პასუხი ჯერ ჩაწერე.'
-        input.focus()
-        return
-      }
-
-      const correct = this.isCorrect(question, answer, input.value)
-
-      if (!correct) {
-        feedback.textContent = question.hint
-          ? `პასუხი არასწორია. ${question.hint} გამოწვევა თავიდან იწყება…`
-          : 'პასუხი არასწორია. გამოწვევა თავიდან იწყება…'
-        input.disabled = true
-        ;(form.querySelector('button') as HTMLButtonElement).disabled = true
-
-        window.setTimeout(() => {
-          if (this.disposed) return
-          modal.hidden = true
-          this.resetLevel()
-          this.questionOpen = false
-          this.running = true
-          this.lastTime = performance.now()
-        }, question.hint ? 2600 : 1100)
-        return
-      }
-
-      this.answeredQuestionIndices.add(this.currentQuestionIndex)
+    const button = modal.querySelector('button') as HTMLButtonElement
+    button.addEventListener('click', () => {
       modal.hidden = true
       this.levelIndex++
       this.resetLevel()
-      this.questionOpen = false
+      this.modalOpen = false
       this.running = true
       this.lastTime = performance.now()
     })
 
-    window.setTimeout(() => input.focus(), 50)
+    window.setTimeout(() => button.focus(), 50)
   }
 
   private showVictory() {
@@ -3025,7 +3003,7 @@ export class CPUDash {
         <div class="cpu-card-icon">🏆</div>
         <h2>CPU Dash დასრულებულია!</h2>
         <p>
-          ყველა ${LEVELS.length} ეტაპი გაიარე და ციფრული ცოდნაც დაამტკიცე.
+          ყველა ${LEVELS.length} ეტაპი გაიარე.
           შესანიშნავი შედეგია!
         </p>
         <button class="cpu-submit" type="button">სამეფოში დაბრუნება</button>
@@ -3036,47 +3014,10 @@ export class CPUDash {
     modal.querySelector('button')!.addEventListener('click', () => this.close())
   }
 
-  private pickQuestion() {
-    const available = this.bank
-      .map((_, index) => index)
-      .filter(index => !this.answeredQuestionIndices.has(index))
-
-    const pool = available.length > 0
-      ? available
-      : this.bank.map((_, index) => index)
-
-    let candidates = pool.filter(index => index !== this.lastQuestion)
-    if (candidates.length === 0) candidates = pool
-
-    const index = candidates[Math.floor(Math.random() * candidates.length)]
-    this.lastQuestion = index
-    return index
-  }
-
-  private isCorrect(question: Question, answer: string, raw = answer) {
-    if (question.check) return question.check(raw)
-    const expected = question.answers.map(a => this.normalize(a))
-    if (expected.includes(answer)) return true
-    if (!question.anyOf) return false
-
-    // რამდენიმე სწორი პასუხიდან ნებისმიერი ან რამდენიმე ერთად ("სინტაქსური და ლოგიკური")
-    const filler = new Set(['და', 'შეცდომა', 'შეცდომები'])
-    const tokens = answer.split(' ').filter(tk => tk && !filler.has(tk))
-    return tokens.length > 0 && tokens.every(tk => expected.includes(tk))
-  }
-
-  private normalize(value: string) {
-    return value
-      .trim()
-      .toLocaleLowerCase('ka-GE')
-      .replace(/[.,!?;:'"“”‘’()[\]{}]/g, '')
-      .replace(/\s+/g, ' ')
-  }
-
   private fail() {
     this.flash = 0.18
     this.running = false
-    this.questionOpen = true
+    this.modalOpen = true
 
     const modal = this.root.querySelector('.cpu-modal') as HTMLDivElement
     modal.hidden = false
@@ -3092,7 +3033,7 @@ export class CPUDash {
     modal.querySelector('button')!.addEventListener('click', () => {
       modal.hidden = true
       this.resetLevel()
-      this.questionOpen = false
+      this.modalOpen = false
       this.running = true
       this.lastTime = performance.now()
     })

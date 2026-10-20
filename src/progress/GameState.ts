@@ -39,6 +39,10 @@ export interface SessionData {
   openedTopics: string[]
   /** თემის id -> სწორად პასუხგაცემული კითხვების id-ები (ჯილდო ყოველ კითხვაზე ერთხელ) */
   solved: Record<string, string[]>
+  /** სამჭედლოს მისალმების ტექსტი ამ სესიაში უკვე ნაჩვენებია */
+  forgeIntroSeen: boolean
+  /** "თემა:წრე" -> კითხვების შემთხვევითი მიმდევრობა (ყოველ მოსწავლეს თავისი, სესიის განმავლობაში უცვლელი) */
+  quizOrder: Record<string, string[]>
   /** სტატისტიკა გაკვეთილის შემდეგ ეკონომიკის დასარეგულირებლად */
   stats: {
     typingCoins: number
@@ -57,6 +61,8 @@ function emptyData(): SessionData {
     unlockedGames: [],
     openedTopics: [],
     solved: {},
+    forgeIntroSeen: false,
+    quizOrder: {},
     stats: { typingCoins: 0, quizBooks: 0, coinsExchanged: 0, booksSpentOnGames: 0 },
   }
 }
@@ -127,6 +133,16 @@ export class GameState {
 
   get stats(): SessionData['stats'] {
     return this.data.stats
+  }
+
+  get forgeIntroSeen(): boolean {
+    return this.data.forgeIntroSeen
+  }
+
+  markForgeIntroSeen() {
+    if (this.data.forgeIntroSeen) return
+    this.data.forgeIntroSeen = true
+    this.save()
   }
 
   /** ყველაფრის განულება (ახალი გაკვეთილი/ახალი მოსწავლე) */
@@ -209,6 +225,27 @@ export class GameState {
     if (this.isTopicOpened(id)) return
     this.data.openedTopics.push(id)
     this.save()
+  }
+
+  /**
+   * ქვიზის კითხვების შემთხვევითი მიმდევრობა. ერთხელ დგინდება და სესიაში არ იცვლება,
+   * ამიტომ მეზობლებს კითხვები სხვადასხვა რიგით აქვთ და "პირველის პასუხი" ერთმანეთს არ გამოადგებათ.
+   */
+  quizOrderFor(topicId: string, round: number, ids: string[]): string[] {
+    const key = `${topicId}:${round}`
+    const saved = this.data.quizOrder[key]
+    const valid =
+      saved && saved.length === ids.length && ids.every(id => saved.includes(id))
+    if (valid) return [...saved]
+
+    const order = [...ids]
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[order[i], order[j]] = [order[j], order[i]]
+    }
+    this.data.quizOrder[key] = order
+    this.save()
+    return [...order]
   }
 
   isSolved(topicId: string, questionId: string): boolean {
