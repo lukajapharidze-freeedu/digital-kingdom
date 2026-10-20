@@ -11,17 +11,21 @@ import {
 } from '../ui/PauseMenu'
 
 import { createWorld } from './World'
-import { CollisionSystem } from './Collision'
+import { CollisionSystem, type WorldCollider } from './Collision'
 import { Player } from './Player'
 import { GameCamera } from './Camera'
 import { CPUDash } from '../minigames/CPUDash'
 import { GameState } from '../progress/GameState'
 import { ECONOMY, GAMES } from '../progress/economy'
-import { KingdomPanels } from '../ui/KingdomPanels'
+import { KingdomPanels, type PanelKind } from '../ui/KingdomPanels'
+import { GuidePath } from './GuidePath'
+import { showGuideModal } from '../ui/GuideModal'
+import { bookIcon, coinIcon, currencyWrap, decorateCurrency } from '../ui/currencyIcons'
 import { gameVisual } from '../progress/gameIcons'
 import { TypingGrandmaster } from '../minigames/TypingGrandmaster'
 import { FlappyFloppy } from '../minigames/FlappyFloppy'
 import { JumpUpTower } from '../minigames/JumpUpTower'
+import { SixSeven } from '../minigames/SixSeven'
 
 import {
   createKingdomWorld,
@@ -36,8 +40,28 @@ import {
 
 type WorldName = 'island' | 'kingdom'
 
-const FORGE_INTRO_TEXT =
-  'სამჭედლოში უნდა გამოვწრთოთ შენი ცოდნა, რომელიც იქნება ისეთივე ბასრი, როგორც სამურაის ხმალი. წინ გელოდება თამაშის სამყარო, თუმცა დაბრკოლებებით სავსე. მზად ხარ ამ გამოწვევისთვის?'
+/** გადაადგილების კლავიშები (კამერის ავტომატური თვალყურისთვის) */
+const MOVE_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
+
+/** რამდენი წამი უნდა გაგრძელდეს სიარული, რომ კამერამ გმირის უკან გადასვლა დაიწყოს */
+const FOLLOW_DELAY = 0.3
+
+/** საწყისი საათები: კუნძულზე თამაშის დაწყებისას და სამეფოში პირველად შესვლისას */
+const ISLAND_START_HOUR = 17
+const KINGDOM_START_HOUR = 18
+
+/** რომელი კლასებისთვის ირთვება ნაბიჯ-ნაბიჯ სახელმძღვანელო (ფანჯრები + მწვანე გზა) */
+const GUIDE_GRADES: Grade[] = [2, 3]
+
+/** საწყისი კუნძულის რადიუსი (გზის საძებნად) */
+const ISLAND_RADIUS = 12.5
+
+const GUIDE_TEXT: Record<string, { text: string; icon: string }> = {
+  'enter-kingdom': { text: 'შედი ციფრულ სამეფოში', icon: '🏰' },
+  'go-library': { text: 'მიდი ბიბლიოთეკაში', icon: '📚' },
+  'go-academy': { text: 'მიდი აკადემიაში', icon: '🎓' },
+  'go-forge': { text: 'მიღებული წიგნები გადაცვალე თამაშებში', icon: '⚒️' },
+}
 
 export class Game {
   private readonly scene: THREE.Scene
@@ -54,20 +78,30 @@ export class Game {
   private readonly state: GameState
   private readonly panels: KingdomPanels
   private readonly hud: HTMLDivElement
+  private readonly guidePath: GuidePath
+  private readonly islandColliders: WorldCollider[]
+  private guideDelay = 0.4
+  private readonly heldMoveKeys = new Set<string>()
+  private moveYaw: number | null = null
+  private moveHeldTime = 0
+  private guideModalOpen = false
+  private lastCoins = 0
+  private lastBooks = 0
   private readonly sun: THREE.DirectionalLight | null
   private readonly cycle: DayNightCycle | null
+  private kingdomVisited = false
   private lastTimeLabel = ''
 
   private readonly interactionPrompt: HTMLDivElement
   private readonly locationLabel: HTMLDivElement
 
-  private forgeIntroOverlay: HTMLDivElement | null = null
   private forgeGamesOverlay: HTMLDivElement | null = null
 
   private cpuDashActive = false
   private cpuDash: CPUDash | null = null
 
   private typingGrandmasterActive = false
+  private sixSevenActive = false
   private flappyActive = false
   private flappyFloppy: FlappyFloppy | null = null
   private jumpTowerActive = false
@@ -117,6 +151,8 @@ export class Game {
       object => !(object instanceof THREE.Light)
     )
 
+    this.islandColliders = island.colliders
+
     this.islandCollision = new CollisionSystem(
       island.colliders
     )
@@ -133,14 +169,18 @@ export class Game {
     this.player = new Player(this.islandCollision)
     this.scene.add(this.player.group)
 
+    // მიმთითებელი მწვანე გზა (ჯერ საწყის კუნძულზე)
+    this.guidePath = new GuidePath()
+    this.guidePath.setWorld(this.islandColliders, ISLAND_RADIUS)
+    this.scene.add(this.guidePath.group)
+
     this.gameCamera = new GameCamera(
       this.renderer.domElement
     )
 
     this.clock = new THREE.Clock()
 
-    // დღე/საღამო/ღამის ციკლი მუშაობს მხოლოდ სამეფოში;
-    // საწყის კუნძულზე სცენა ზუსტად ისე რჩება, როგორც იყო.
+    // დღე/საღამო/ღამის ციკლი მუშაობს საწყის კუნძულზეც და სამეფოშიც
     this.sun =
       this.scene.children.find(
         (object): object is THREE.DirectionalLight =>
@@ -161,12 +201,11 @@ export class Game {
           ambient,
           camera: this.gameCamera.camera,
           world: this.kingdom,
-          startHour: 10,
+          // თამაში საწყის კუნძულზე 17:00-დან იწყება (სამეფოში პირველ შესვლაზე — 18:00)
+          startHour: ISLAND_START_HOUR,
           dayLengthSeconds: 300,
         })
       : null
-
-    this.cycle?.setEnabled(false)
 
     this.createUI()
 
@@ -219,7 +258,10 @@ export class Game {
       state: this.state,
       getGrade: () => this.grade,
       toast: text => this.showToast(text),
-      onClose: () => this.updateInteractions(),
+      onClose: kind => {
+        this.updateInteractions()
+        this.onPanelClosed(kind)
+      },
     })
 
     this.hud = document.createElement('div')
@@ -248,6 +290,9 @@ export class Game {
     this.pauseMenu.onAction(this.handlePauseAction)
 
     window.addEventListener('keydown', this.onKeyDown)
+    window.addEventListener('keydown', this.onMoveKeyDown)
+    window.addEventListener('keyup', this.onMoveKeyUp)
+    window.addEventListener('blur', this.onMoveBlur)
     window.addEventListener('resize', this.onResize)
 
     // ზედა პანელების განლაგება — მხოლოდ მაშინ, როცა ყველა ელემენტი უკვე შექმნილია
@@ -298,11 +343,13 @@ export class Game {
   }
 
   private updateLocationLabel() {
-    if (this.currentWorld === 'island' || !this.cycle) {
-      this.locationLabel.textContent =
-        this.currentWorld === 'island'
-          ? '🏝️ საწყისი კუნძული'
-          : '🏰 ციფრული სამეფოს ეზო'
+    const place =
+      this.currentWorld === 'island'
+        ? '🏝️ საწყისი კუნძული'
+        : '🏰 ციფრული სამეფოს ეზო'
+
+    if (!this.cycle) {
+      this.locationLabel.textContent = place
       return
     }
 
@@ -315,7 +362,7 @@ export class Game {
 
     this.lastTimeLabel = this.cycle.timeLabel
     this.locationLabel.textContent =
-      `🏰 ციფრული სამეფოს ეზო • ${icons[this.cycle.phase]} ${this.lastTimeLabel}`
+      `${place} • ${icons[this.cycle.phase]} ${this.lastTimeLabel}`
   }
 
   private distanceTo(x: number, z: number) {
@@ -329,6 +376,7 @@ export class Game {
       this.cpuDashActive ||
       this.typingGrandmasterActive ||
       this.flappyActive ||
+      this.sixSevenActive ||
       this.jumpTowerActive
     )
   }
@@ -365,12 +413,29 @@ export class Game {
   }
 
   private updateHud() {
-    this.hud.textContent = `🪙 ${this.state.coins}   📘 ${this.state.books}`
+    const coins = this.state.coins
+    const books = this.state.books
+
+    const item = (icon: string, value: number) =>
+      `<span style="display:inline-flex;align-items:center;gap:8px;">${currencyWrap(icon)}<span style="font-size:24px;font-weight:900;">${value}</span></span>`
+
+    this.hud.innerHTML = `${item(coinIcon(34), coins)}<span style="width:20px;display:inline-block;"></span>${item(bookIcon(34), books)}`
+
+    // მცირე "აფრქვევა", როცა რამე დაემატა
+    if (coins > this.lastCoins || books > this.lastBooks) {
+      this.hud.animate?.(
+        [{ transform: 'scale(1)' }, { transform: 'scale(1.18)' }, { transform: 'scale(1)' }],
+        { duration: 420, easing: 'ease-out' },
+      )
+    }
+    this.lastCoins = coins
+    this.lastBooks = books
   }
 
   private showToast(text: string) {
     const toast = document.createElement('div')
     toast.textContent = text
+    decorateCurrency(toast)
     toast.style.cssText = `
       position: fixed;
       top: 80px;
@@ -405,9 +470,9 @@ export class Game {
 
   private isForgeModalOpen() {
     return (
-      this.forgeIntroOverlay !== null ||
       this.forgeGamesOverlay !== null ||
-      this.panels.isOpen()
+      this.panels.isOpen() ||
+      this.guideModalOpen
     )
   }
 
@@ -541,91 +606,12 @@ export class Game {
     return button
   }
 
-  private showForgeIntro() {
-    if (!this.forgeEnabled() || this.isForgeModalOpen()) return
-
-    this.interactionPrompt.style.display = 'none'
-    this.currentInteraction = null
-
-    // მისალმების ტექსტი ერთ სესიაში მხოლოდ პირველ მისვლაზე ჩანს
-    this.state.markForgeIntroSeen()
-
-    const overlay = this.createModalOverlay()
-    const card = this.createModalCard()
-
-    const icon = document.createElement('div')
-    icon.textContent = '⚒️'
-    icon.style.cssText = 'font-size: 54px; margin-bottom: 8px;'
-
-    const title = document.createElement('h1')
-    title.textContent = 'სამჭედლო'
-    title.style.cssText = `
-      margin: 0 0 18px;
-      font-size: clamp(26px, 5vw, 38px);
-      color: #784323;
-    `
-
-    const text = document.createElement('p')
-    text.textContent = FORGE_INTRO_TEXT
-    text.style.cssText = `
-      margin: 0 auto 24px;
-      max-width: 560px;
-      font-size: clamp(17px, 2.6vw, 21px);
-      line-height: 1.75;
-    `
-
-    const controls = document.createElement('p')
-    controls.textContent =
-      'Enter — ვეთანხმები  •  Esc — უარი'
-    controls.style.cssText = `
-      margin: 0 0 22px;
-      color: #586b7c;
-      font-size: 14px;
-      font-weight: bold;
-    `
-
-    const buttons = document.createElement('div')
-    buttons.style.cssText = `
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 12px;
-    `
-
-    const accept = this.createModalButton(
-      '↵ ვეთანხმები',
-      '#27834a'
-    )
-
-    const decline = this.createModalButton(
-      'Esc — უარი',
-      '#b44c48'
-    )
-
-    accept.addEventListener('click', () => {
-      this.showForgeGames()
-    })
-
-    decline.addEventListener('click', () => {
-      this.closeForgeModal()
-    })
-
-    buttons.append(accept, decline)
-    card.append(icon, title, text, controls, buttons)
-    overlay.appendChild(card)
-    document.body.appendChild(overlay)
-
-    this.forgeIntroOverlay = overlay
-  }
-
   private showForgeGames() {
     if (!this.forgeEnabled()) {
       this.closeForgeModal()
       return
     }
 
-    this.forgeIntroOverlay?.remove()
-    this.forgeIntroOverlay = null
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
 
@@ -655,6 +641,7 @@ export class Game {
 
     const balance = document.createElement('div')
     balance.textContent = `🪙 ${this.state.coins}      📘 ${this.state.books}`
+    decorateCurrency(balance)
     balance.style.cssText = `
       display: inline-block;
       margin-bottom: 18px;
@@ -783,6 +770,7 @@ export class Game {
             if (game.id === 'typing-grandmaster') this.startTypingGrandmaster()
             if (game.id === 'flappy-floppy') this.startFlappyFloppy()
             if (game.id === 'jump-up-tower') this.startJumpUpTower()
+            if (game.id === 'six-seven') this.startSixSeven()
             return
           }
 
@@ -834,6 +822,7 @@ export class Game {
     })
 
     card.append(title, subtitle, balance, list, footer, closeButton)
+    decorateCurrency(card)
     overlay.appendChild(card)
     document.body.appendChild(overlay)
 
@@ -846,8 +835,6 @@ export class Game {
 
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
-    this.forgeIntroOverlay?.remove()
-    this.forgeIntroOverlay = null
 
     this.interactionPrompt.style.display = 'none'
     this.currentInteraction = null
@@ -869,8 +856,6 @@ export class Game {
 
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
-    this.forgeIntroOverlay?.remove()
-    this.forgeIntroOverlay = null
 
     this.interactionPrompt.style.display = 'none'
     this.currentInteraction = null
@@ -901,8 +886,6 @@ export class Game {
 
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
-    this.forgeIntroOverlay?.remove()
-    this.forgeIntroOverlay = null
 
     this.interactionPrompt.style.display = 'none'
     this.currentInteraction = null
@@ -919,14 +902,33 @@ export class Game {
     })
   }
 
+  private startSixSeven() {
+    if (!this.forgeEnabled() || this.sixSevenActive) return
+    if (!this.state.isGameUnlocked('six-seven')) return
+
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
+
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+    this.sixSevenActive = true
+    this.clock.getDelta()
+
+    new SixSeven({
+      onClose: () => {
+        this.sixSevenActive = false
+        this.clock.getDelta()
+        this.updateInteractions()
+      },
+    })
+  }
+
   private startJumpUpTower() {
     if (!this.forgeEnabled() || this.jumpTowerActive) return
     if (!this.state.isGameUnlocked('jump-up-tower')) return
 
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
-    this.forgeIntroOverlay?.remove()
-    this.forgeIntroOverlay = null
 
     this.interactionPrompt.style.display = 'none'
     this.currentInteraction = null
@@ -945,10 +947,8 @@ export class Game {
 
   private closeForgeModal() {
     this.panels.close()
-    this.forgeIntroOverlay?.remove()
     this.forgeGamesOverlay?.remove()
 
-    this.forgeIntroOverlay = null
     this.forgeGamesOverlay = null
 
     this.currentInteraction = null
@@ -963,7 +963,19 @@ export class Game {
     }
 
     this.kingdom.group.visible = true
-    this.cycle?.setEnabled(true)
+
+    // სამეფოში პირველად შესვლისას საათი 18:00-ზე გადადის, შემდეგ დრო ჩვეულებრივად გრძელდება
+    if (!this.kingdomVisited) {
+      this.kingdomVisited = true
+      this.cycle?.setHour(KINGDOM_START_HOUR)
+    }
+    this.guidePath.setWorld(this.kingdom.colliders, this.kingdom.radius)
+
+    // სახელმძღვანელო: სამეფოში შესვლის შემდეგ — ბიბლიოთეკისკენ
+    if (this.guideActive() && this.state.guideStep === 'enter-kingdom') {
+      this.state.setGuide('go-library', false)
+      this.guideDelay = 1
+    }
 
     this.player.enterWorld(
       this.kingdomCollision,
@@ -972,7 +984,7 @@ export class Game {
       this.kingdom.radius
     )
 
-    this.gameCamera.reset()
+    this.resetCamera()
     this.updateLocationLabel()
     this.updateInteractions()
   }
@@ -981,7 +993,7 @@ export class Game {
     this.closeForgeModal()
     this.currentWorld = 'island'
     this.kingdom.group.visible = false
-    this.cycle?.setEnabled(false)
+    this.guidePath.setWorld(this.islandColliders, ISLAND_RADIUS)
 
     for (const object of this.islandObjects) {
       object.visible = true
@@ -994,29 +1006,52 @@ export class Game {
       12.5
     )
 
-    this.gameCamera.reset()
+    this.resetCamera()
     this.updateLocationLabel()
     this.updateInteractions()
   }
 
+  // ---------- კამერა გმირს მიჰყვება ----------
+  // გადაადგილების მიმართულება იმ მომენტის კამერას ეფუძნება, როცა კლავიშები შეიცვალა.
+  // ამიტომ კამერის ავტომატური ბრუნვა გმირს წრეზე არ ატარებს: სიარული სწორია, კამერა კი გმირის უკან გადადის.
+
+  private onMoveKeyDown = (event: KeyboardEvent) => {
+    if (!MOVE_KEYS.has(event.code) || event.repeat) return
+    if (this.heldMoveKeys.has(event.code)) return
+    this.heldMoveKeys.add(event.code)
+    this.moveYaw = this.gameCamera.yaw
+  }
+
+  private onMoveKeyUp = (event: KeyboardEvent) => {
+    if (!MOVE_KEYS.has(event.code)) return
+    this.heldMoveKeys.delete(event.code)
+    this.moveYaw = this.heldMoveKeys.size > 0 ? this.gameCamera.yaw : null
+    if (this.heldMoveKeys.size === 0) this.moveHeldTime = 0
+  }
+
+  private onMoveBlur = () => {
+    this.heldMoveKeys.clear()
+    this.moveYaw = null
+    this.moveHeldTime = 0
+  }
+
+  /** კამერის ახლიდან დაყენება (სამყაროს შეცვლისას) და გადაადგილების მდგომარეობის გასუფთავება */
+  private resetCamera() {
+    this.gameCamera.reset()
+    this.onMoveBlur()
+  }
+
   private onKeyDown = (event: KeyboardEvent) => {
     if (this.changingGrade) return
+    if (this.guideModalOpen) return
     if (this.miniGameActive()) return
 
     if (event.code === 'Escape' && this.isForgeModalOpen()) {
       event.preventDefault()
       event.stopPropagation()
+      // ბიბლიოთეკის პირველ ვიზიტზე Esc არ ხურავს (ჯერ ტექსტი უნდა დასრულდეს)
+      if (this.panels.isOpen() && !this.panels.canClose()) return
       this.closeForgeModal()
-      return
-    }
-
-    if (
-      event.code === 'Enter' &&
-      this.forgeIntroOverlay !== null
-    ) {
-      event.preventDefault()
-      event.stopPropagation()
-      this.showForgeGames()
       return
     }
 
@@ -1035,7 +1070,6 @@ export class Game {
       event.code === 'KeyT' &&
       !event.repeat &&
       !this.paused &&
-      this.currentWorld === 'kingdom' &&
       this.cycle
     ) {
       const order: DayPhase[] = ['day', 'evening', 'night', 'dawn']
@@ -1057,6 +1091,9 @@ export class Game {
 
     if (!this.currentInteraction) return
 
+    // E-ს ასო არ უნდა ჩაიწეროს ახლად გახსნილი ფანჯრის ველში (მაგ. ბიბლიოთეკის კოდში)
+    event.preventDefault()
+
     if (this.currentInteraction.type === 'enter') {
       this.enterKingdom()
       return
@@ -1073,12 +1110,12 @@ export class Game {
       if (building.id === 'forge') {
         if (!this.forgeEnabled()) return
 
-        // პირველ მისვლაზე მისალმების ტექსტი, შემდეგ — პირდაპირ თამაშების არჩევანი
-        if (this.state.forgeIntroSeen) {
-          this.showForgeGames()
-        } else {
-          this.showForgeIntro()
+        if (this.guideActive() && this.state.guideStep === 'go-forge') {
+          this.state.setGuide('done', true)
         }
+
+        // თანხმობის ფანჯრის გარეშე — პირდაპირ თამაშების არჩევანი
+        this.showForgeGames()
         return
       }
 
@@ -1104,6 +1141,110 @@ export class Game {
 
       this.interactionPrompt.textContent =
         `🏗️ ${building.name} — მისიები მალე დაემატება`
+    }
+  }
+
+  // ---------- სახელმძღვანელო: ნაბიჯ-ნაბიჯ გზა ----------
+
+  private guideActive(): boolean {
+    return GUIDE_GRADES.includes(this.grade) && this.state.guideStep !== 'done'
+  }
+
+  /** სად უნდა მიდიოდეს ახლა მოსწავლე (მწვანე გზის სამიზნე) */
+  private guideTarget(): { x: number; z: number } | null {
+    const step = this.state.guideStep
+    if (step === 'done') return null
+
+    if (this.currentWorld === 'island') {
+      // პირველი ფანჯრის "კარგი"-მდე გზა ჯერ არ ჩანს
+      if (step === 'enter-kingdom' && !this.state.guideAck) return null
+      return { x: 0, z: -8.12 }
+    }
+
+    if (step === 'enter-kingdom' || !this.state.guideAck) return null
+
+    const id = step === 'go-library' ? 'library' : step === 'go-academy' ? 'academy' : 'forge'
+    const building = this.kingdom.buildings.find(b => b.id === id)
+    return building ? { x: building.position.x, z: building.position.z } : null
+  }
+
+  private canShowGuideModal(): boolean {
+    const step = this.state.guideStep
+    const worldOk = step === 'enter-kingdom' ? this.currentWorld === 'island' : this.currentWorld === 'kingdom'
+    return (
+      worldOk &&
+      !this.paused &&
+      !this.changingGrade &&
+      !this.isForgeModalOpen() &&
+      !this.miniGameActive()
+    )
+  }
+
+  private updateGuide(delta: number) {
+    const active = this.guideActive()
+    const target = active ? this.guideTarget() : null
+
+    this.guidePath.setTarget(target)
+    const showPath =
+      target !== null &&
+      !this.paused &&
+      !this.changingGrade &&
+      !this.isForgeModalOpen() &&
+      !this.miniGameActive()
+    this.guidePath.group.visible = showPath
+
+    if (showPath) {
+      const position = this.player.group.position
+      this.guidePath.update(delta, position.x, position.z)
+    }
+
+    if (!active) return
+
+    // თემა უკვე გახსნილია (მაგ. გვერდის გადატვირთვის შემდეგ) — ბიბლიოთეკის ნაბიჯი გამოვტოვოთ
+    if (
+      this.currentWorld === 'kingdom' &&
+      this.state.guideStep === 'go-library' &&
+      this.state.openedTopicIds().length > 0 &&
+      !this.panels.isOpen()
+    ) {
+      this.state.setGuide('go-academy', false)
+      this.guideDelay = 0.6
+    }
+
+    // ფანჯარა ნაბიჯის დასაწყისში (მცირე დაყოვნებით)
+    if (!this.state.guideAck && this.canShowGuideModal()) {
+      this.guideDelay -= delta
+      if (this.guideDelay <= 0) void this.showGuideStepModal()
+    }
+  }
+
+  private async showGuideStepModal() {
+    const step = this.state.guideStep
+    const content = GUIDE_TEXT[step]
+    if (!content || this.guideModalOpen) return
+
+    this.guideModalOpen = true
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+
+    await showGuideModal({ text: content.text, icon: content.icon })
+
+    this.guideModalOpen = false
+    this.clock.getDelta()
+    if (this.state.guideStep === step) this.state.setGuide(step, true)
+  }
+
+  /** პანელის დახურვა: ბიბლიოთეკის/აკადემიის შემდეგ ავდივართ შემდეგ ნაბიჯზე */
+  private onPanelClosed(kind: PanelKind | null) {
+    if (!this.guideActive()) return
+    const step = this.state.guideStep
+
+    if (kind === 'library' && step === 'go-library' && this.state.openedTopicIds().length > 0) {
+      this.state.setGuide('go-academy', false)
+      this.guideDelay = 0.6
+    } else if (kind === 'academy' && step === 'go-academy' && this.state.books > 0) {
+      this.state.setGuide('go-forge', false)
+      this.guideDelay = 0.6
     }
   }
 
@@ -1151,7 +1292,7 @@ export class Game {
       12.5
     )
 
-    this.gameCamera.reset()
+    this.resetCamera()
     this.resumeGame()
   }
 
@@ -1166,6 +1307,7 @@ export class Game {
 
     this.grade = selection.grade
     this.updateGradeUI()
+    this.guideDelay = 0.4
 
     if (this.currentWorld === 'kingdom') {
       this.returnToIsland()
@@ -1178,7 +1320,7 @@ export class Game {
       12.5
     )
 
-    this.gameCamera.reset()
+    this.resetCamera()
     this.changingGrade = false
     this.resumeGame()
   }
@@ -1204,24 +1346,45 @@ export class Game {
     const modalOpen = this.isForgeModalOpen()
 
     if (!this.paused && !this.changingGrade && !modalOpen && !this.miniGameActive()) {
+      const moving = this.heldMoveKeys.size > 0
+
       this.player.update(
         delta,
-        this.gameCamera.yaw
+        moving && this.moveYaw !== null
+          ? this.moveYaw
+          : this.gameCamera.yaw
       )
+
+      // სიარულისას კამერა ნელა გადადის გმირის უკან (მაუსით ატრიალება ისევ შეიძლება)
+      if (moving) {
+        this.moveHeldTime += delta
+
+        if (this.moveHeldTime > FOLLOW_DELAY) {
+          this.gameCamera.follow(
+            this.player.group.rotation.y,
+            delta
+          )
+        }
+      } else {
+        this.moveHeldTime = 0
+      }
 
       if (this.currentWorld === 'kingdom') {
         this.kingdom.animals.update(delta)
         this.kingdom.update(delta)
-        this.cycle?.update(delta)
-
-        if (this.cycle && this.cycle.timeLabel !== this.lastTimeLabel) {
-          this.updateLocationLabel()
-        }
       }
 
-      this.gameCamera.update(this.player.group)
+      this.cycle?.update(delta)
+
+      if (this.cycle && this.cycle.timeLabel !== this.lastTimeLabel) {
+        this.updateLocationLabel()
+      }
+
+      this.gameCamera.update(this.player.group, delta)
       this.updateInteractions()
     }
+
+    this.updateGuide(delta)
 
     this.renderer.render(
       this.scene,

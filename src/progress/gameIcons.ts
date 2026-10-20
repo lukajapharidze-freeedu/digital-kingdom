@@ -105,6 +105,18 @@ const VISUALS: Record<string, GameVisual> = {
         <path d="M32 3 L43 15 H36 V21 H28 V15 H21 Z" fill="#59d66a" stroke="#1f7a32" stroke-width="2" stroke-linejoin="round"/>
       </svg>`,
   },
+
+  // 6 7 — ორი დახრილი ციფრი
+  'six-seven': {
+    colors: ['#ffe066', '#e0457b'],
+    svg: `
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g font-family="Arial, sans-serif" font-size="34" font-weight="900" stroke="#7a1240" stroke-width="2" paint-order="stroke">
+          <text x="6" y="40" fill="#ffffff" transform="rotate(-12 16 30)">6</text>
+          <text x="34" y="48" fill="#fff3b0" transform="rotate(12 44 38)">7</text>
+        </g>
+      </svg>`,
+  },
 }
 
 const FALLBACK: GameVisual = {

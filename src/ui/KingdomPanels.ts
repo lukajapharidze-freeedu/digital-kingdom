@@ -1,21 +1,27 @@
 import type { Grade } from './GradeSelect'
 import { ECONOMY, GAMES } from '../progress/economy'
 import { gameVisual } from '../progress/gameIcons'
+import { decorateCurrency } from './currencyIcons'
+import { showGuideModal } from './GuideModal'
 import type { GameState } from '../progress/GameState'
 import {
   findTopicByCode,
   isAnswerCorrect,
+  questionPrompt,
   roundQuestions,
   topicsForGrade,
   type Topic,
+  type TopicPicture,
   type TopicQuestion,
 } from '../content/topics'
+
+export type PanelKind = 'library' | 'academy' | 'shop' | 'wallet'
 
 interface PanelsOptions {
   state: GameState
   getGrade: () => Grade
   toast: (text: string) => void
-  onClose?: () => void
+  onClose?: (kind: PanelKind | null) => void
 }
 
 const OVERLAY_CSS = `
@@ -105,6 +111,110 @@ function richText(parent: HTMLElement, text: string) {
   })
 }
 
+// ილუსტრაციის ფონები — გვერდიდან გვერდზე იცვლება, რომ ყოველი გვერდი განსხვავებულად დაამახსოვრდეთ
+const PICTURE_TONES = [
+  ['#e8f3ff', '#f5fbff', '#3d86c6'],
+  ['#fff1dc', '#fffaf1', '#e39a2d'],
+  ['#e7f8ec', '#f6fff8', '#38a169'],
+  ['#f3ebff', '#fbf8ff', '#8a5cc7'],
+  ['#ffe9ef', '#fff7f9', '#d0567a'],
+]
+
+const EMOJI_FONT = `'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif`
+
+/** გვერდის ნახატი: დიდი ხატულები წარწერებით, მათ შორის ისრები ან ნიშნები */
+function pictureBox(picture: TopicPicture, tone: number): HTMLElement {
+  const [from, to, accent] = PICTURE_TONES[tone % PICTURE_TONES.length]
+  const box = make(
+    'figure',
+    `
+      margin: 0 0 0.6em;
+      padding: 0.55em 0.7em;
+      border-radius: 16px;
+      background: linear-gradient(135deg, ${from}, ${to});
+      border: 2px dashed ${accent}55;
+      text-align: center;
+    `,
+  )
+
+  const strip = make(
+    'div',
+    'display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.45em;',
+  )
+  picture.items.forEach((item, index) => {
+    if (index > 0 && picture.joiner) {
+      strip.appendChild(
+        make('span', `font-size: 1.5em; font-weight: 900; color: ${accent}; font-family: ${EMOJI_FONT};`, picture.joiner),
+      )
+    }
+    const tile = make(
+      'div',
+      `
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.15em;
+        min-width: 4.6em;
+        max-width: 12em;
+        padding: 0.35em 0.55em 0.3em;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 3px 0 ${accent}33, 0 4px 12px rgba(38, 54, 74, 0.08);
+      `,
+    )
+    // ემოჯი დიდად; ჩვეულებრივი ტექსტი (Ctrl+C, 01000001, „პაროლი“) — კლავიშის/კოდის სახით
+    const symbols = [...item.icon.replace(/[️‍]/g, '')].length
+    const plain = !/\p{Extended_Pictographic}/u.test(item.icon) && symbols > 2
+    const emojiSize = symbols > 6 ? 1.25 : symbols > 3 ? 1.6 : 2.1
+    tile.appendChild(
+      make(
+        'div',
+        plain
+          ? `
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 1.05em;
+            font-weight: 800;
+            line-height: 1.35;
+            color: #17406f;
+            padding: 0.2em 0.5em;
+            border-radius: 8px;
+            border: 1px solid #c9d6e4;
+            border-bottom-width: 3px;
+            background: #f6f9fc;
+            white-space: ${symbols > 16 ? 'normal' : 'nowrap'};
+          `
+          : `font-size: ${emojiSize}em; line-height: 1.15; font-family: ${EMOJI_FONT};`,
+        item.icon,
+      ),
+    )
+    if (item.label) {
+      tile.appendChild(
+        make('div', 'font-size: 0.68em; font-weight: 700; line-height: 1.25; color: #3c4f63;', item.label),
+      )
+    }
+    if (item.mark) {
+      tile.appendChild(
+        make(
+          'span',
+          `position: absolute; top: -0.45em; right: -0.45em; font-size: 0.95em; font-family: ${EMOJI_FONT};`,
+          item.mark === 'yes' ? '✅' : '❌',
+        ),
+      )
+    }
+    strip.appendChild(tile)
+  })
+  box.appendChild(strip)
+
+  if (picture.caption) {
+    box.appendChild(
+      make('figcaption', `margin-top: 0.4em; font-size: 0.78em; font-weight: 700; color: ${accent};`, picture.caption),
+    )
+  }
+  return box
+}
+
 function row(...children: HTMLElement[]): HTMLDivElement {
   const box = make(
     'div',
@@ -118,7 +228,8 @@ export class KingdomPanels {
   private readonly state: GameState
   private readonly getGrade: () => Grade
   private readonly toast: (text: string) => void
-  private readonly onCloseCallback: (() => void) | undefined
+  private readonly onCloseCallback: ((kind: PanelKind | null) => void) | undefined
+  private kind: PanelKind | null = null
   private overlay: HTMLDivElement | null = null
   private card: HTMLDivElement | null = null
   /** ბიბლიოთეკის ტექსტის ფანჯარაში ჩასატევი ფუნქცია (ეკრანის ზომის შეცვლისას თავიდან ეშვება) */
@@ -136,13 +247,23 @@ export class KingdomPanels {
     return this.overlay !== null
   }
 
+  /**
+   * შეიძლება თუ არა პანელის დახურვა მოსწავლის მიერ (ღილაკი/Esc).
+   * ბიბლიოთეკის პირველ ვიზიტზე — არა, სანამ ტექსტს ბოლომდე არ წაიკითხავს.
+   */
+  canClose(): boolean {
+    return this.kind !== 'library' || this.state.libraryReadDone
+  }
+
   close() {
     if (!this.overlay) return
     this.overlay.remove()
+    const closed = this.kind
     this.overlay = null
     this.card = null
     this.readerFit = null
-    this.onCloseCallback?.()
+    this.kind = null
+    this.onCloseCallback?.(closed)
   }
 
   // ---------- საერთო ნაწილები ----------
@@ -197,8 +318,9 @@ export class KingdomPanels {
 
   private footer(card: HTMLElement, ...extra: HTMLElement[]) {
     card.appendChild(
-      row(...extra, button('დახურვა (Esc)', '#315b88', () => this.close())),
+      row(...extra, ...(this.canClose() ? [button('დახურვა (Esc)', '#315b88', () => this.close())] : [])),
     )
+    decorateCurrency(card)
   }
 
   private message(card: HTMLElement, text: string, color = '#26364a') {
@@ -211,7 +333,7 @@ export class KingdomPanels {
   private protectInput(input: HTMLInputElement) {
     input.addEventListener('keydown', event => {
       event.stopPropagation()
-      if (event.code === 'Escape') this.close()
+      if (event.code === 'Escape' && this.canClose()) this.close()
     })
     input.addEventListener('keyup', event => event.stopPropagation())
   }
@@ -228,10 +350,11 @@ export class KingdomPanels {
   // ---------- ბიბლიოთეკა ----------
 
   openLibrary() {
+    this.kind = 'library'
     this.renderLibraryHome()
   }
 
-  private renderLibraryHome(message = '', messageColor = '#b44c48', highlightId = '') {
+  private renderLibraryHome(message = '', messageColor = '#b44c48') {
     const card = this.mount()
     this.header(
       card,
@@ -262,7 +385,6 @@ export class KingdomPanels {
           border: 2px solid #38a169;
           border-radius: 14px;
           background: linear-gradient(135deg, #f0fff4, #ffffff);
-          ${topic.id === highlightId ? 'box-shadow: 0 0 0 5px rgba(246, 189, 53, 0.75);' : ''}
         `,
       )
       const info = make('div', 'font-weight: bold; font-size: 17px;', `${topic.icon} ${topic.title}`)
@@ -328,11 +450,11 @@ export class KingdomPanels {
       const first = !this.state.isTopicOpened(topic.id)
       this.state.openTopic(topic.id)
       if (first) this.toast(`🔓 თემა გაიხსნა: ${topic.title}`)
-      this.renderLibraryHome(
-        '🔓 თემა გაიხსნა! 📖 ძირითადი ტექსტი ყველასთვისაა. ➕ დამატებითი ტექსტი კი ვისაც უფრო მეტის სწავლა უნდა.',
-        '#18834a',
-        topic.id,
-      )
+      // ჯერ დასათანხმებელი ფანჯარა, შემდეგ პირდაპირ ძირითადი ტექსტი (დამატებითი სიაში ღილაკით რჩება)
+      submit.disabled = true
+      void showGuideModal({ text: 'ყურადღებით წაიკითხე დავალება', icon: '📖' }).then(() => {
+        if (this.kind === 'library') this.renderReader(topic, false, 0)
+      })
     })
     card.appendChild(form)
 
@@ -420,6 +542,8 @@ export class KingdomPanels {
       ),
     )
 
+    if (page.picture) body.appendChild(pictureBox(page.picture, index + (extra ? 2 : 0)))
+
     for (const paragraph of page.body) {
       const p = make('p', 'margin: 0 0 0.55em;')
       richText(p, paragraph)
@@ -496,14 +620,18 @@ export class KingdomPanels {
       button('← წინა', '#6b7c8f', () => this.renderReader(topic, extra, index - 1), index === 0),
       isLast
         ? button('✅ დასრულება', '#27834a', () => {
-            this.renderLibraryHome(
-              '✨ ტექსტი წაკითხულია! ახლა აკადემიაში გამოსცადე თავი და მიიღე 📘 წიგნები.',
-              '#18834a',
-            )
+            // ტექსტის დასრულებისას პირდაპირ გამოვდივართ ბიბლიოთეკიდან; ამიერიდან დახურვა/სიაში ღილაკები აქტიურია
+            this.state.markLibraryReadDone()
+            this.close()
+            this.toast('✨ ტექსტი წაკითხულია! ახლა აკადემიაში გამოსცადე თავი და მიიღე 📘 წიგნები.')
           })
         : button('შემდეგი →', '#27834a', () => this.renderReader(topic, extra, index + 1)),
-      button('სიაში', '#315b88', () => this.renderLibraryHome()),
-      button('დახურვა (Esc)', '#315b88', () => this.close()),
+      ...(this.canClose()
+        ? [
+            button('სიაში', '#315b88', () => this.renderLibraryHome()),
+            button('დახურვა (Esc)', '#315b88', () => this.close()),
+          ]
+        : []),
     )
     controls.style.marginTop = '12px'
     card.appendChild(controls)
@@ -528,7 +656,25 @@ export class KingdomPanels {
   // ---------- აკადემია ----------
 
   openAcademy() {
+    this.kind = 'academy'
     this.renderAcademyHome()
+
+    // თუ ამოსახსნელი ქვიზი არსებობს: ჯერ დასათანხმებელი ფანჯარა, შემდეგ პირდაპირ კითხვები
+    const next = this.nextQuiz()
+    if (!next) return
+    void showGuideModal({ text: 'უპასუხე კითხვებს', icon: '🎓' }).then(() => {
+      if (this.kind === 'academy') this.renderQuiz(next.topic, next.round)
+    })
+  }
+
+  /** პირველი გახსნილი თემის დაუსრულებელი ქვიზი (ჯერ ქვიზი 1, შემდეგ ქვიზი 2) */
+  private nextQuiz(): { topic: Topic; round: 1 | 2 } | null {
+    const opened = topicsForGrade(this.getGrade()).filter(topic => this.state.isTopicOpened(topic.id))
+    for (const topic of opened) {
+      if (!this.roundDone(topic, 1)) return { topic, round: 1 }
+      if (!this.roundDone(topic, 2)) return { topic, round: 2 }
+    }
+    return null
   }
 
   private renderAcademyHome(message = '') {
@@ -660,7 +806,7 @@ export class KingdomPanels {
           line-height: 1.6;
           font-weight: bold;
         `,
-        `${number}. ${current.prompt}`,
+        `${number}. ${questionPrompt(current)}`,
       ),
     )
 
@@ -747,6 +893,7 @@ export class KingdomPanels {
   // ---------- მაღაზია ----------
 
   openShop() {
+    this.kind = 'shop'
     this.renderShop()
   }
 
@@ -800,6 +947,7 @@ export class KingdomPanels {
   // ---------- საგანძურის საცავი ----------
 
   openWallet() {
+    this.kind = 'wallet'
     const card = this.mount()
     this.header(card, '💎', 'საგანძურის საცავი', 'აქ ინახება შენი მონეტები, წიგნები და გახსნილი თამაშები.')
     this.balance(card)

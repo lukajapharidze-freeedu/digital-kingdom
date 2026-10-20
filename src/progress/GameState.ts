@@ -29,6 +29,9 @@ function isPageReload(): boolean {
   }
 }
 
+/** სახელმძღვანელო გზის ნაბიჯები: სამეფო → ბიბლიოთეკა → აკადემია → სამჭედლო */
+export type GuideStep = 'enter-kingdom' | 'go-library' | 'go-academy' | 'go-forge' | 'done'
+
 export interface SessionData {
   version: 1
   /** ბოლო შენახვის დრო (ms) */
@@ -39,8 +42,11 @@ export interface SessionData {
   openedTopics: string[]
   /** თემის id -> სწორად პასუხგაცემული კითხვების id-ები (ჯილდო ყოველ კითხვაზე ერთხელ) */
   solved: Record<string, string[]>
-  /** სამჭედლოს მისალმების ტექსტი ამ სესიაში უკვე ნაჩვენებია */
-  forgeIntroSeen: boolean
+  /** ბიბლიოთეკის ტექსტი ერთხელ მაინც ბოლომდე წაკითხულია (მანამდე ბიბლიოთეკიდან გასვლა არ შეიძლება) */
+  libraryReadDone: boolean
+  /** სახელმძღვანელო გზა: რომელ ნაბიჯზეა მოსწავლე და ნაჩვენებია თუ არა ამ ნაბიჯის ფანჯარა */
+  guideStep: GuideStep
+  guideAck: boolean
   /** "თემა:წრე" -> კითხვების შემთხვევითი მიმდევრობა (ყოველ მოსწავლეს თავისი, სესიის განმავლობაში უცვლელი) */
   quizOrder: Record<string, string[]>
   /** სტატისტიკა გაკვეთილის შემდეგ ეკონომიკის დასარეგულირებლად */
@@ -61,7 +67,9 @@ function emptyData(): SessionData {
     unlockedGames: [],
     openedTopics: [],
     solved: {},
-    forgeIntroSeen: false,
+    libraryReadDone: false,
+    guideStep: 'enter-kingdom',
+    guideAck: false,
     quizOrder: {},
     stats: { typingCoins: 0, quizBooks: 0, coinsExchanged: 0, booksSpentOnGames: 0 },
   }
@@ -135,13 +143,28 @@ export class GameState {
     return this.data.stats
   }
 
-  get forgeIntroSeen(): boolean {
-    return this.data.forgeIntroSeen
+  get libraryReadDone(): boolean {
+    return this.data.libraryReadDone
   }
 
-  markForgeIntroSeen() {
-    if (this.data.forgeIntroSeen) return
-    this.data.forgeIntroSeen = true
+  get guideStep(): GuideStep {
+    return this.data.guideStep
+  }
+
+  get guideAck(): boolean {
+    return this.data.guideAck
+  }
+
+  setGuide(step: GuideStep, ack: boolean) {
+    if (this.data.guideStep === step && this.data.guideAck === ack) return
+    this.data.guideStep = step
+    this.data.guideAck = ack
+    this.save()
+  }
+
+  markLibraryReadDone() {
+    if (this.data.libraryReadDone) return
+    this.data.libraryReadDone = true
     this.save()
   }
 
