@@ -8,6 +8,7 @@ import {
   roundQuestions,
   topicsForGrade,
   type Topic,
+  type TopicPicture,
   type TopicQuestion,
 } from '../content/topics'
 
@@ -103,6 +104,110 @@ function richText(parent: HTMLElement, text: string) {
       index % 2 === 1 ? make('strong', STRONG_CSS, part) : make('span', '', part),
     )
   })
+}
+
+// ილუსტრაციის ფონები — გვერდიდან გვერდზე იცვლება, რომ ყოველი გვერდი განსხვავებულად დაამახსოვრდეთ
+const PICTURE_TONES = [
+  ['#e8f3ff', '#f5fbff', '#3d86c6'],
+  ['#fff1dc', '#fffaf1', '#e39a2d'],
+  ['#e7f8ec', '#f6fff8', '#38a169'],
+  ['#f3ebff', '#fbf8ff', '#8a5cc7'],
+  ['#ffe9ef', '#fff7f9', '#d0567a'],
+]
+
+const EMOJI_FONT = `'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif`
+
+/** გვერდის ნახატი: დიდი ხატულები წარწერებით, მათ შორის ისრები ან ნიშნები */
+function pictureBox(picture: TopicPicture, tone: number): HTMLElement {
+  const [from, to, accent] = PICTURE_TONES[tone % PICTURE_TONES.length]
+  const box = make(
+    'figure',
+    `
+      margin: 0 0 0.6em;
+      padding: 0.55em 0.7em;
+      border-radius: 16px;
+      background: linear-gradient(135deg, ${from}, ${to});
+      border: 2px dashed ${accent}55;
+      text-align: center;
+    `,
+  )
+
+  const strip = make(
+    'div',
+    'display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.45em;',
+  )
+  picture.items.forEach((item, index) => {
+    if (index > 0 && picture.joiner) {
+      strip.appendChild(
+        make('span', `font-size: 1.5em; font-weight: 900; color: ${accent}; font-family: ${EMOJI_FONT};`, picture.joiner),
+      )
+    }
+    const tile = make(
+      'div',
+      `
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.15em;
+        min-width: 4.6em;
+        max-width: 12em;
+        padding: 0.35em 0.55em 0.3em;
+        border-radius: 14px;
+        background: #ffffff;
+        box-shadow: 0 3px 0 ${accent}33, 0 4px 12px rgba(38, 54, 74, 0.08);
+      `,
+    )
+    // ემოჯი დიდად; ჩვეულებრივი ტექსტი (Ctrl+C, 01000001, „პაროლი“) — კლავიშის/კოდის სახით
+    const symbols = [...item.icon.replace(/[️‍]/g, '')].length
+    const plain = !/\p{Extended_Pictographic}/u.test(item.icon) && symbols > 2
+    const emojiSize = symbols > 6 ? 1.25 : symbols > 3 ? 1.6 : 2.1
+    tile.appendChild(
+      make(
+        'div',
+        plain
+          ? `
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 1.05em;
+            font-weight: 800;
+            line-height: 1.35;
+            color: #17406f;
+            padding: 0.2em 0.5em;
+            border-radius: 8px;
+            border: 1px solid #c9d6e4;
+            border-bottom-width: 3px;
+            background: #f6f9fc;
+            white-space: ${symbols > 16 ? 'normal' : 'nowrap'};
+          `
+          : `font-size: ${emojiSize}em; line-height: 1.15; font-family: ${EMOJI_FONT};`,
+        item.icon,
+      ),
+    )
+    if (item.label) {
+      tile.appendChild(
+        make('div', 'font-size: 0.68em; font-weight: 700; line-height: 1.25; color: #3c4f63;', item.label),
+      )
+    }
+    if (item.mark) {
+      tile.appendChild(
+        make(
+          'span',
+          `position: absolute; top: -0.45em; right: -0.45em; font-size: 0.95em; font-family: ${EMOJI_FONT};`,
+          item.mark === 'yes' ? '✅' : '❌',
+        ),
+      )
+    }
+    strip.appendChild(tile)
+  })
+  box.appendChild(strip)
+
+  if (picture.caption) {
+    box.appendChild(
+      make('figcaption', `margin-top: 0.4em; font-size: 0.78em; font-weight: 700; color: ${accent};`, picture.caption),
+    )
+  }
+  return box
 }
 
 function row(...children: HTMLElement[]): HTMLDivElement {
@@ -419,6 +524,8 @@ export class KingdomPanels {
         `${icons[index % icons.length]} ${page.title}`,
       ),
     )
+
+    if (page.picture) body.appendChild(pictureBox(page.picture, index + (extra ? 2 : 0)))
 
     for (const paragraph of page.body) {
       const p = make('p', 'margin: 0 0 0.55em;')
