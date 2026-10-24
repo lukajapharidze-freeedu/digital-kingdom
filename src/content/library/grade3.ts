@@ -21,7 +21,7 @@ export const GRADE_3_TOPICS: Topic[] = [
           joiner: '=',
           items: [
             { icon: '💻', label: 'კომპიუტერი' },
-            { icon: '🔢', label: 'გამომთვლელი' },
+            { icon: 'svg:calculator', label: 'გამომთვლელი' },
           ],
           caption: 'compute (ინგლ.) = გამოთვლა',
         },
@@ -67,8 +67,8 @@ export const GRADE_3_TOPICS: Topic[] = [
         picture: {
           joiner: '→',
           items: [
-            { icon: '🏢', label: 'ოთახის ოდენა' },
-            { icon: '🖥️', label: 'პერსონალური' },
+            { icon: 'svg:mainframe', label: 'ოთახის ოდენა' },
+            { icon: 'svg:desktop', label: 'პერსონალური' },
             { icon: '💻', label: 'ლეპტოპი' },
             { icon: '📱', label: 'სმარტფონი' },
           ],
@@ -217,9 +217,9 @@ export const GRADE_3_TOPICS: Topic[] = [
         title: 'კომპიუტერების სახეები',
         picture: {
           items: [
-            { icon: '🖥️', label: 'პერსონალური' },
+            { icon: 'svg:desktop', label: 'პერსონალური' },
             { icon: '💻', label: 'ლეპტოპი' },
-            { icon: '📲', label: 'ტაბლეტი' },
+            { icon: 'svg:tablet', label: 'ტაბლეტი' },
             { icon: '📱', label: 'სმარტფონი' },
           ],
         },
@@ -233,8 +233,8 @@ export const GRADE_3_TOPICS: Topic[] = [
         title: 'მეინფრეიმი და სუპერკომპიუტერი',
         picture: {
           items: [
-            { icon: '🏦', label: 'მეინფრეიმი — ბანკი' },
-            { icon: '🚀', label: 'სუპერკომპიუტერი — კოსმოსი' },
+            { icon: 'svg:mainframe', label: 'მეინფრეიმი — ბანკი' },
+            { icon: 'svg:server', label: 'სუპერკომპიუტერი — კოსმოსი' },
             { icon: '🌦️', label: 'ამინდის პროგნოზი' },
           ],
         },
@@ -251,7 +251,7 @@ export const GRADE_3_TOPICS: Topic[] = [
         title: 'ჩაშენებული სისტემა',
         picture: {
           items: [
-            { icon: '🧺', label: 'სარეცხი მანქანა' },
+            { icon: 'svg:washer', label: 'სარეცხი მანქანა' },
             { icon: '🚗', label: 'ავტომობილი' },
             { icon: '🚦', label: 'შუქნიშანი' },
             { icon: '🛗', label: 'ლიფტი' },
@@ -645,7 +645,7 @@ export const GRADE_3_TOPICS: Topic[] = [
         picture: {
           items: [
             { icon: '📱', label: 'ტელეფონი' },
-            { icon: '🧺', label: 'სარეცხი მანქანა' },
+            { icon: 'svg:washer', label: 'სარეცხი მანქანა' },
             { icon: '🚗', label: 'ავტომობილი' },
             { icon: '📺', label: 'ტელევიზორი' },
           ],
@@ -1282,7 +1282,7 @@ export const GRADE_3_TOPICS: Topic[] = [
           joiner: '—',
           items: [
             { icon: '💻', label: 'კომპ. 1' },
-            { icon: '📡', label: 'როუტერი' },
+            { icon: 'svg:router', label: 'როუტერი' },
             { icon: '💻', label: 'კომპ. 2' },
             { icon: '🖨️', label: 'პრინტერი' },
           ],
@@ -1658,7 +1658,7 @@ export const GRADE_3_TOPICS: Topic[] = [
           items: [
             { icon: '🎨', label: 'შემქმნელი' },
             { icon: '🌐', label: 'ინტერნეტი' },
-            { icon: '📡', label: 'როუტერი' },
+            { icon: 'svg:router', label: 'როუტერი' },
             { icon: 'svg:server', label: 'სერვერი N1' },
           ],
         },
@@ -2187,7 +2187,7 @@ export const GRADE_3_TOPICS: Topic[] = [
         title: 'რობოტები ჩვენ გარშემო',
         picture: {
           items: [
-            { icon: '🧹', label: 'რობოტი-მტვერსასრუტი' },
+            { icon: 'svg:robovac', label: 'რობოტი-მტვერსასრუტი' },
             { icon: '🏭', label: 'ქარხანა' },
             { icon: '🏥', label: 'საავადმყოფო' },
             { icon: '🪐', label: 'კოსმოსი' },
@@ -2220,7 +2220,7 @@ export const GRADE_3_TOPICS: Topic[] = [
         picture: {
           joiner: '+',
           items: [
-            { icon: '⚙️', label: 'ძრავა' },
+            { icon: 'svg:motor', label: 'ძრავა' },
             { icon: '⚫', label: 'ბორბლები' },
             { icon: '📡', label: 'სენსორები' },
             { icon: '🔋', label: 'ბატარეა' },
@@ -2271,8 +2271,8 @@ export const GRADE_3_TOPICS: Topic[] = [
         picture: {
           joiner: '+',
           items: [
-            { icon: '⚙️', label: 'სათამაშო ძრავი' },
-            { icon: '🔘', label: 'ჩამრთველი' },
+            { icon: 'svg:motor', label: 'სათამაშო ძრავი' },
+            { icon: 'svg:switch', label: 'ჩამრთველი' },
             { icon: '🔋🔋', label: '2 ბატარეა' },
           ],
         },

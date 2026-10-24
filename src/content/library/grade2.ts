@@ -275,7 +275,7 @@ export const GRADE_2_TOPICS: Topic[] = [
           items: [
             { icon: '👕', label: 'მაისური' },
             { icon: '🏷️', label: 'ეტიკეტი' },
-            { icon: '🧺', label: 'რეცხვის წესი' },
+            { icon: 'svg:washer', label: 'რეცხვის წესი' },
             { icon: '30°C', label: 'წყლის სიცხე' },
           ],
         },
@@ -1126,7 +1126,7 @@ export const GRADE_2_TOPICS: Topic[] = [
         picture: {
           items: [
             { icon: '🧮', label: 'აბაკი' },
-            { icon: '🔢', label: 'კალკულატორი' },
+            { icon: 'svg:calculator', label: 'კალკულატორი' },
             { icon: '💻', label: 'კომპიუტერი' },
           ],
         },

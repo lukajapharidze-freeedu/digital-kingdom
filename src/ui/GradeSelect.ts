@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 
+// პიქსელური ფონტი თამაშის სათაურისთვის (თამაშთან ერთად იტვირთება, ინტერნეტი არ სჭირდება)
+import '@fontsource/press-start-2p/latin-400.css'
+
 import {
   createCharacter,
 } from '../characters/Character'
@@ -140,8 +143,13 @@ export function showGradeSelect():
               data-grade="teacher"
               type="button"
             >
-              <span class="grade-number">
-                🧑‍🏫
+              <span class="grade-number grade-teacher-icon">
+                <svg viewBox="0 0 64 64" aria-hidden="true">
+                  <path d="M32 10 L60 23 L32 36 L4 23 Z" fill="#234b64"/>
+                  <path d="M16 29 V42 C16 48 48 48 48 42 V29 L32 36.5 Z" fill="#2f6488"/>
+                  <path d="M54 25.5 V40" stroke="#f2b53a" stroke-width="3" stroke-linecap="round"/>
+                  <circle cx="54" cy="43" r="4" fill="#f2b53a"/>
+                </svg>
               </span>
 
               <span class="grade-label">

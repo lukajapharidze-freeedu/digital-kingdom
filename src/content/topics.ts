@@ -177,7 +177,7 @@ export const TOPICS: Topic[] = [
       {
         id: 'q2',
         round: 1,
-        prompt: 'ინგლისური სიტყვა „bug“ რას ნიშნავს? (ერთი სიტყვით)',
+        prompt: 'ინგლისური სიტყვა „bug“ რას ნიშნავს?',
         answers: ['მწერი', 'მწერს', 'მწერია', 'ჩრჩილი', 'ხოჭო'],
         page: 2,
       },
@@ -208,7 +208,7 @@ export const TOPICS: Topic[] = [
       {
         id: 'q6',
         round: 1,
-        prompt: 'როგორ ჰქვია შეცდომის პოვნას და გასწორებას? (ქართულად ან ინგლისურად)',
+        prompt: 'როგორ ჰქვია შეცდომის პოვნას და გასწორებას?',
         answers: ['გამართვა', 'გამართვაა', 'debugging', 'დებაგინგი', 'debug', 'დებაგი'],
         page: 5,
       },
@@ -319,7 +319,7 @@ export const TOPICS: Topic[] = [
     extraPages: [
       {
         title: 'ძირითადი და დამატებითი მოწყობილობები',
-        picture: { items: [{ icon: '🖥️', label: 'ძირითადი' }, { icon: '🖨️', label: 'დამატებითი' }] },
+        picture: { items: [{ icon: 'svg:desktop', label: 'ძირითადი' }, { icon: '🖨️', label: 'დამატებითი' }] },
         body: [
           'ძირითადი მოწყობილობებია: **სისტემური ბლოკი, მონიტორი, კლავიატურა** და **მაუსი**. მათ გარეშე კომპიუტერთან მუშაობა ძნელია.',
           '**დამატებითი** (დამხმარე) მოწყობილობებია, მაგალითად: პრინტერი, სკანერი, მიკროფონი, ვებ-კამერა, დინამიკი, ყურსასმენი, პროექტორი, ჯოისტიკი, გეიმპადი, ფლეშ მეხსიერება და უწყვეტი დენის წყარო.',
@@ -403,7 +403,7 @@ export const TOPICS: Topic[] = [
         id: 'q9',
         round: 2,
         prompt:
-          'რა საფრთხე შეიძლება იყოს უცნობ ფლეშ მეხსიერებაში, რომელიც კომპიუტერს აზიანებს? (ერთი სიტყვა)',
+          'რა საფრთხე შეიძლება იყოს უცნობ ფლეშ მეხსიერებაში, რომელიც კომპიუტერს აზიანებს?',
         answers: ['ვირუსი', 'ვირუსია', 'ვირუსს', 'ვირუსით'],
         page: 2,
       },
@@ -411,7 +411,7 @@ export const TOPICS: Topic[] = [
         id: 'q10',
         round: 2,
         prompt:
-          'ფაილების შესაკუმშად რომელი სახელის ფაილს ვქმნით? (ინგლისური სამი ასო)',
+          'ფაილების შესაკუმშად რომელი სახელის ფაილს ვქმნით?',
         answers: ['zip', '.zip', 'ზიპ', 'ზიპი'],
         page: 2,
       },
@@ -438,6 +438,20 @@ export function findTopicByCode(code: string): Topic | undefined {
 
 export function roundQuestions(topic: Topic, round: 1 | 2): TopicQuestion[] {
   return topic.questions.filter(question => question.round === round)
+}
+
+/**
+ * კითხვის ტექსტი მინიშნებით ფრჩხილებში: თუ პასუხი ერთი სიტყვაა — "ერთი სიტყვით",
+ * თუ ინგლისური სიტყვაც მიიღება — "ქართულად ან ინგლისურად".
+ */
+export function questionPrompt(question: TopicQuestion): string {
+  // თუ კითხვას უკვე აქვს თავისი მინიშნება ფრჩხილებში (მაგ. „(ციფრით)“), მეორეს აღარ ვამატებთ
+  if (/\([^)]*\)\s*$/.test(question.prompt)) return question.prompt
+  const notes: string[] = []
+  const main = question.answers[0]?.trim() ?? ''
+  if (main && !main.includes(' ')) notes.push('ერთი სიტყვით')
+  if (question.answers.some(answer => /[a-z]/i.test(answer))) notes.push('ქართულად ან ინგლისურად')
+  return notes.length > 0 ? `${question.prompt} (${notes.join(', ')})` : question.prompt
 }
 
 // ---------- პასუხის შემოწმება ----------
@@ -502,7 +516,7 @@ export function questionsForGame(
     const pool = round1Done ? topic.questions : round1
 
     return pool.map(question => ({
-      prompt: question.prompt,
+      prompt: questionPrompt(question),
       answers: question.answers,
       hint: `მინიშნება: პასუხი ბიბლიოთეკაში, ${
         question.round === 1 ? 'ძირითადი' : 'დამატებითი'
