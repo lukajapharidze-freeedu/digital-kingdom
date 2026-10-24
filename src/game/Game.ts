@@ -10,6 +10,8 @@ import {
   type PauseAction,
 } from '../ui/PauseMenu'
 
+import type { TeacherCodes } from '../content/teacher'
+
 import { createWorld } from './World'
 import { CollisionSystem } from './Collision'
 import { Player } from './Player'
@@ -76,6 +78,8 @@ export class Game {
 
   private currentWorld: WorldName = 'island'
   private grade: Grade
+  /** მასწავლებლის რეჟიმში — კლასების კოდები (ღილაკი M), მოსწავლისთვის null */
+  private teacherCodes: TeacherCodes | null
   private paused = false
   private changingGrade = false
 
@@ -85,8 +89,9 @@ export class Game {
     | { type: 'building'; building: KingdomBuilding }
     | null = null
 
-  constructor(grade: Grade) {
+  constructor(grade: Grade, teacherCodes: TeacherCodes | null = null) {
     this.grade = grade
+    this.teacherCodes = teacherCodes
     this.scene = new THREE.Scene()
 
     this.renderer = new THREE.WebGLRenderer({
@@ -214,6 +219,7 @@ export class Game {
 
     // პროგრესი (მონეტები, წიგნები, გახსნილი თამაშები) მხოლოდ მიმდინარე სესიაში ინახება
     this.state = new GameState()
+    this.state.setTeacherMode(this.teacherCodes !== null)
 
     this.panels = new KingdomPanels({
       state: this.state,
@@ -263,6 +269,10 @@ export class Game {
     return 'IV'
   }
 
+  private gradeTitle(): string {
+    return this.teacherCodes ? '🧑‍🏫 მასწავლებელი' : `${this.getGradeRoman()} კლასი`
+  }
+
   private createUI() {
     const ui = document.createElement('div')
     ui.className = 'game-ui'
@@ -272,7 +282,7 @@ export class Game {
       <div class="stars">⭐ <span>0 / 5</span></div>
       <div class="welcome">
         <strong>კეთილი იყოს შენი მობრძანება!</strong>
-        <span>${this.getGradeRoman()} კლასი • გამოიკვლიე ციფრული სამეფო ✨</span>
+        <span>${this.gradeTitle()} • გამოიკვლიე ციფრული სამეფო ✨</span>
       </div>
       <div class="controls">
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> მოძრაობა</div>
@@ -282,6 +292,7 @@ export class Game {
         <div><kbd>E</kbd> ინტერაქცია</div>
         <div><kbd>T</kbd> დრო (დღე / საღამო / ღამე)</div>
         <div><kbd>ESC</kbd> მენიუ</div>
+        <div class="teacher-only" style="display: ${this.teacherCodes ? '' : 'none'}"><kbd>M</kbd> კლასის კოდები</div>
       </div>
     `
 
@@ -293,8 +304,11 @@ export class Game {
 
     if (welcome) {
       welcome.textContent =
-        `${this.getGradeRoman()} კლასი • გამოიკვლიე ციფრული სამეფო ✨`
+        `${this.gradeTitle()} • გამოიკვლიე ციფრული სამეფო ✨`
     }
+
+    const teacherHint = document.querySelector('.game-ui .teacher-only') as HTMLElement | null
+    if (teacherHint) teacherHint.style.display = this.teacherCodes ? '' : 'none'
   }
 
   private updateLocationLabel() {
@@ -1020,6 +1034,17 @@ export class Game {
       return
     }
 
+    // მასწავლებლის კოდების ფანჯარა: M ხსნის და ხურავს
+    if (event.code === 'KeyM' && !event.repeat && !this.paused && this.teacherCodes) {
+      if (this.panels.isCodesOpen()) {
+        this.closeForgeModal()
+      } else if (!this.isForgeModalOpen()) {
+        this.panels.openTeacherCodes(this.teacherCodes)
+        this.updateInteractions()
+      }
+      return
+    }
+
     if (this.isForgeModalOpen()) return
 
     if (event.code === 'Escape') {
@@ -1165,6 +1190,8 @@ export class Game {
     const selection = await showGradeSelect()
 
     this.grade = selection.grade
+    this.teacherCodes = selection.teacherCodes
+    this.state.setTeacherMode(this.teacherCodes !== null)
     this.updateGradeUI()
 
     if (this.currentWorld === 'kingdom') {

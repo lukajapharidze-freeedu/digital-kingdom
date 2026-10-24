@@ -6,6 +6,11 @@ import {
 
 import { SCHOOL_LOGO_URL } from '../assets/schoolLogo'
 
+import {
+  unlockTeacherCodes,
+  type TeacherCodes,
+} from '../content/teacher'
+
 export type Grade =
   | 2
   | 3
@@ -13,7 +18,12 @@ export type Grade =
 
 export interface GradeSelectResult {
   grade: Grade
+  /** მასწავლებლის რეჟიმში — გაშიფრული კოდები, მოსწავლისთვის null */
+  teacherCodes: TeacherCodes | null
 }
+
+// მასწავლებელი თამაშს მე-4 კლასის სამეფოში იწყებს (იქ ყველა შენობა და სამჭედლოა)
+const TEACHER_GRADE: Grade = 4
 
 export function showGradeSelect():
   Promise<GradeSelectResult> {
@@ -21,6 +31,8 @@ export function showGradeSelect():
     (resolve) => {
       let selectedGrade:
         Grade = 2
+
+      let teacherSelected = false
 
       const overlay =
         document.createElement(
@@ -123,7 +135,46 @@ export function showGradeSelect():
               </span>
             </button>
 
+            <button
+              class="grade-card grade-card-teacher"
+              data-grade="teacher"
+              type="button"
+            >
+              <span class="grade-number">
+                🧑‍🏫
+              </span>
+
+              <span class="grade-label">
+                მასწავლებელი
+              </span>
+
+              <span class="grade-check">
+                ✓
+              </span>
+            </button>
+
           </div>
+
+          <form
+            class="teacher-login"
+            hidden
+          >
+            <label
+              class="teacher-login-label"
+              for="teacher-password"
+            >
+              🔒 მასწავლებლის პაროლი
+            </label>
+
+            <input
+              id="teacher-password"
+              class="teacher-login-input"
+              type="password"
+              autocomplete="off"
+            />
+
+            <p class="teacher-login-error"></p>
+          </form>
 
           <button
             class="start-adventure"
@@ -140,6 +191,35 @@ export function showGradeSelect():
         overlay
       )
 
+      const teacherForm =
+        overlay
+          .querySelector<HTMLFormElement>(
+            '.teacher-login'
+          )!
+
+      const teacherInput =
+        overlay
+          .querySelector<HTMLInputElement>(
+            '.teacher-login-input'
+          )!
+
+      const teacherError =
+        overlay
+          .querySelector<HTMLParagraphElement>(
+            '.teacher-login-error'
+          )!
+
+      // პაროლის აკრეფისას თამაშის კლავიშები (WASD, E, T) არ უნდა ამუშავდეს
+      teacherInput.addEventListener(
+        'keydown',
+        (event) => event.stopPropagation()
+      )
+
+      teacherInput.addEventListener(
+        'keyup',
+        (event) => event.stopPropagation()
+      )
+
       const cards =
         overlay
           .querySelectorAll<HTMLButtonElement>(
@@ -151,13 +231,25 @@ export function showGradeSelect():
           card.addEventListener(
             'click',
             () => {
-              const value =
-                Number(
-                  card.dataset.grade
-                ) as Grade
+              teacherSelected =
+                card.dataset.grade ===
+                'teacher'
 
-              selectedGrade =
-                value
+              if (!teacherSelected) {
+                selectedGrade =
+                  Number(
+                    card.dataset.grade
+                  ) as Grade
+              }
+
+              teacherForm.hidden =
+                !teacherSelected
+
+              teacherError.textContent = ''
+
+              if (teacherSelected) {
+                teacherInput.focus()
+              }
 
               cards.forEach(
                 (otherCard) => {
@@ -311,15 +403,32 @@ export function showGradeSelect():
             '.start-adventure'
           )!
 
-      startButton.addEventListener(
-        'click',
+      const start =
         () => {
-          localStorage.setItem(
-            'digitalKingdomGrade',
-            String(
-              selectedGrade
+          let teacherCodes:
+            TeacherCodes | null = null
+
+          if (teacherSelected) {
+            teacherCodes =
+              unlockTeacherCodes(
+                teacherInput.value
+              )
+
+            if (!teacherCodes) {
+              teacherError.textContent =
+                '❌ პაროლი არასწორია'
+
+              teacherInput.select()
+              return
+            }
+          } else {
+            localStorage.setItem(
+              'digitalKingdomGrade',
+              String(
+                selectedGrade
+              )
             )
-          )
+          }
 
           overlay.classList.add(
             'grade-select-leaving'
@@ -337,11 +446,27 @@ export function showGradeSelect():
 
               resolve({
                 grade:
-                  selectedGrade,
+                  teacherCodes
+                    ? TEACHER_GRADE
+                    : selectedGrade,
+                teacherCodes,
               })
             },
             450
           )
+        }
+
+      startButton.addEventListener(
+        'click',
+        start
+      )
+
+      // პაროლის ველში Enter = დაწყება
+      teacherForm.addEventListener(
+        'submit',
+        (event) => {
+          event.preventDefault()
+          start()
         }
       )
     }

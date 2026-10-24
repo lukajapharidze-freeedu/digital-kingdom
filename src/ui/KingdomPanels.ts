@@ -2,6 +2,8 @@ import type { Grade } from './GradeSelect'
 import { ECONOMY, GAMES } from '../progress/economy'
 import { gameVisual } from '../progress/gameIcons'
 import type { GameState } from '../progress/GameState'
+import { hasPictureIcon, pictureIconSvg } from './pictureIcons'
+import { TEACHER_GRADES, topicsInLessonOrder, type TeacherCodes } from '../content/teacher'
 import {
   findTopicByCode,
   isAnswerCorrect,
@@ -159,31 +161,37 @@ function pictureBox(picture: TopicPicture, tone: number): HTMLElement {
         box-shadow: 0 3px 0 ${accent}33, 0 4px 12px rgba(38, 54, 74, 0.08);
       `,
     )
-    // ემოჯი დიდად; ჩვეულებრივი ტექსტი (Ctrl+C, 01000001, „პაროლი“) — კლავიშის/კოდის სახით
-    const symbols = [...item.icon.replace(/[️‍]/g, '')].length
-    const plain = !/\p{Extended_Pictographic}/u.test(item.icon) && symbols > 2
-    const emojiSize = symbols > 6 ? 1.25 : symbols > 3 ? 1.6 : 2.1
-    tile.appendChild(
-      make(
-        'div',
-        plain
-          ? `
-            font-family: Consolas, 'Courier New', monospace;
-            font-size: 1.05em;
-            font-weight: 800;
-            line-height: 1.35;
-            color: #17406f;
-            padding: 0.2em 0.5em;
-            border-radius: 8px;
-            border: 1px solid #c9d6e4;
-            border-bottom-width: 3px;
-            background: #f6f9fc;
-            white-space: ${symbols > 16 ? 'normal' : 'nowrap'};
-          `
-          : `font-size: ${emojiSize}em; line-height: 1.15; font-family: ${EMOJI_FONT};`,
-        item.icon,
-      ),
-    )
+    if (hasPictureIcon(item.icon)) {
+      const holder = make('div', 'line-height: 0;')
+      holder.innerHTML = pictureIconSvg(item.icon)
+      tile.appendChild(holder)
+    } else {
+      // ემოჯი დიდად; ჩვეულებრივი ტექსტი (Ctrl+C, 01000001, „პაროლი“) — კლავიშის/კოდის სახით
+      const symbols = [...item.icon.replace(/[️‍]/g, '')].length
+      const plain = !/\p{Extended_Pictographic}/u.test(item.icon) && symbols > 2
+      const emojiSize = symbols > 6 ? 1.25 : symbols > 3 ? 1.6 : 2.1
+      tile.appendChild(
+        make(
+          'div',
+          plain
+            ? `
+              font-family: Consolas, 'Courier New', monospace;
+              font-size: 1.05em;
+              font-weight: 800;
+              line-height: 1.35;
+              color: #17406f;
+              padding: 0.2em 0.5em;
+              border-radius: 8px;
+              border: 1px solid #c9d6e4;
+              border-bottom-width: 3px;
+              background: #f6f9fc;
+              white-space: ${symbols > 16 ? 'normal' : 'nowrap'};
+            `
+            : `font-size: ${emojiSize}em; line-height: 1.15; font-family: ${EMOJI_FONT};`,
+          item.icon,
+        ),
+      )
+    }
     if (item.label) {
       tile.appendChild(
         make('div', 'font-size: 0.68em; font-weight: 700; line-height: 1.25; color: #3c4f63;', item.label),
@@ -210,6 +218,17 @@ function pictureBox(picture: TopicPicture, tone: number): HTMLElement {
   return box
 }
 
+const ROMAN: Record<Grade, string> = { 2: 'II', 3: 'III', 4: 'IV' }
+
+/** კლასის სათაური მასწავლებლის სიებში */
+function gradeHeading(grade: Grade): HTMLElement {
+  return make(
+    'div',
+    'margin: 8px 0 0; font-size: 18px; font-weight: 900; color: #315b88; border-bottom: 2px solid #d1dfeb; padding-bottom: 4px;',
+    `${ROMAN[grade]} კლასი`,
+  )
+}
+
 function row(...children: HTMLElement[]): HTMLDivElement {
   const box = make(
     'div',
@@ -226,6 +245,8 @@ export class KingdomPanels {
   private readonly onCloseCallback: (() => void) | undefined
   private overlay: HTMLDivElement | null = null
   private card: HTMLDivElement | null = null
+  /** მასწავლებლის „კლასის კოდები“ ფანჯარა ღიაა */
+  private codesOpen = false
   /** ბიბლიოთეკის ტექსტის ფანჯარაში ჩასატევი ფუნქცია (ეკრანის ზომის შეცვლისას თავიდან ეშვება) */
   private readerFit: (() => void) | null = null
 
@@ -246,6 +267,7 @@ export class KingdomPanels {
     this.overlay.remove()
     this.overlay = null
     this.card = null
+    this.codesOpen = false
     this.readerFit = null
     this.onCloseCallback?.()
   }
@@ -262,6 +284,7 @@ export class KingdomPanels {
       this.card = card
     }
     this.card.replaceChildren()
+    this.codesOpen = false
     this.card.style.cssText = CARD_CSS
     this.card.scrollTop = 0
     this.readerFit = null
@@ -330,6 +353,19 @@ export class KingdomPanels {
     return total > 0 && this.solvedCount(topic, round) === total
   }
 
+  /** მოსწავლე თავისი კლასის თემებს ხედავს, მასწავლებელი — სამივე კლასისას, საიტის რიგით */
+  private visibleTopics(): Topic[] {
+    if (!this.state.teacherMode) return topicsForGrade(this.getGrade())
+    return TEACHER_GRADES.flatMap(grade => topicsInLessonOrder(grade))
+  }
+
+  /** მასწავლებლის სიაში კლასის სათაური ჩნდება იქ, სადაც ახალი კლასი იწყება */
+  private addGradeHeading(list: HTMLElement, topic: Topic, previous: Topic | undefined) {
+    if (!this.state.teacherMode) return
+    const grade = topic.grades[0]
+    if (previous?.grades[0] !== grade) list.appendChild(gradeHeading(grade))
+  }
+
   // ---------- ბიბლიოთეკა ----------
 
   openLibrary() {
@@ -342,18 +378,21 @@ export class KingdomPanels {
       card,
       '📚',
       'ბიბლიოთეკა',
-      'აქ ვიგებთ ახალ თემებს. შეიყვანე მასწავლებლის კოდი და წაიკითხე ტექსტი.',
+      this.state.teacherMode
+        ? '🧑‍🏫 მასწავლებლის რეჟიმი: ყველა კლასის ყველა თემა გახსნილია. კოდები — ღილაკით M.'
+        : 'აქ ვიგებთ ახალ თემებს. შეიყვანე მასწავლებლის კოდი და წაიკითხე ტექსტი.',
     )
 
-    const topics = topicsForGrade(this.getGrade())
+    const topics = this.visibleTopics()
 
     if (topics.length === 0) {
       this.message(card, 'ამ კლასისთვის თემები მალე დაემატება.')
     }
 
     const list = make('div', 'display: grid; gap: 10px; text-align: left; margin-bottom: 18px;')
-    for (const topic of topics) {
-      if (!this.state.isTopicOpened(topic.id)) continue
+    topics.forEach((topic, index) => {
+      if (!this.state.isTopicOpened(topic.id)) return
+      this.addGradeHeading(list, topic, topics[index - 1])
 
       const item = make(
         'div',
@@ -379,7 +418,7 @@ export class KingdomPanels {
       )
       item.append(info, actions)
       list.appendChild(item)
-    }
+    })
     card.appendChild(list)
 
     const form = make('form', 'display: flex; justify-content: center; flex-wrap: wrap; gap: 10px;')
@@ -425,7 +464,7 @@ export class KingdomPanels {
         this.renderLibraryHome('❌ ასეთი კოდი ვერ ვიპოვე. შეამოწმე და სცადე თავიდან.')
         return
       }
-      if (!topic.grades.includes(this.getGrade())) {
+      if (!this.state.teacherMode && !topic.grades.includes(this.getGrade())) {
         this.renderLibraryHome('ეს კოდი სხვა კლასის თემისაა.')
         return
       }
@@ -648,14 +687,16 @@ export class KingdomPanels {
     )
     this.balance(card)
 
-    const opened = topicsForGrade(this.getGrade()).filter(topic => this.state.isTopicOpened(topic.id))
+    const opened = this.visibleTopics().filter(topic => this.state.isTopicOpened(topic.id))
+    const teacher = this.state.teacherMode
 
     if (opened.length === 0) {
       this.message(card, 'ჯერ ბიბლიოთეკაში გახსენი თემა მასწავლებლის კოდით.')
     }
 
     const list = make('div', 'display: grid; gap: 12px; text-align: left; margin-bottom: 6px;')
-    for (const topic of opened) {
+    opened.forEach((topic, index) => {
+      this.addGradeHeading(list, topic, opened[index - 1])
       const item = make(
         'div',
         `
@@ -685,17 +726,17 @@ export class KingdomPanels {
         button(
           r2Done
             ? `✅ ქვიზი 2 (${r2Total}/${r2Total})`
-            : r1Done
+            : r1Done || teacher
               ? `🧠 ქვიზი 2 (${this.solvedCount(topic, 2)}/${r2Total})`
               : '🔒 ქვიზი 2',
           '#315b88',
           () => this.renderQuiz(topic, 2),
-          !r1Done || r2Done,
+          (!r1Done && !teacher) || r2Done,
         ),
       )
       item.appendChild(actions)
 
-      if (!r1Done) {
+      if (!r1Done && !teacher) {
         item.appendChild(
           make(
             'div',
@@ -705,10 +746,95 @@ export class KingdomPanels {
         )
       }
       list.appendChild(item)
-    }
+    })
     card.appendChild(list)
 
     if (message) this.message(card, message, '#18834a')
+    this.footer(card)
+  }
+
+  // ---------- მასწავლებელი: კლასის კოდები ----------
+
+  isCodesOpen(): boolean {
+    return this.codesOpen
+  }
+
+  /** მასწავლებლის ფანჯარა (ღილაკი M): კლასები სიად; კლასის გახსნისას — თემები საიტის რიგით და მათი კოდები */
+  openTeacherCodes(codes: TeacherCodes, openGrade: Grade | null = null) {
+    const card = this.mount()
+    this.codesOpen = true
+    this.header(card, '🔑', 'კლასის კოდები', 'აირჩიე კლასი — თემები ჩამოთვლილია ისე, როგორც school.emis.ge-ზეა.')
+
+    const list = make('div', 'display: grid; gap: 10px; text-align: left;')
+    for (const grade of TEACHER_GRADES) {
+      const open = openGrade === grade
+      const toggle = make(
+        'button',
+        `
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          width: 100%;
+          padding: 14px 18px;
+          border: 2px solid ${open ? '#315b88' : '#c9d6e4'};
+          border-radius: 14px;
+          background: ${open ? '#e6f1fb' : 'rgba(255,255,255,0.9)'};
+          color: #26364a;
+          font-size: 19px;
+          font-weight: 900;
+          cursor: pointer;
+        `,
+      )
+      toggle.type = 'button'
+      toggle.append(
+        make('span', '', `${ROMAN[grade]} კლასი`),
+        make('span', 'font-size: 15px; color: #536579;', `${codes[grade].length} თემა ${open ? '▲' : '▼'}`),
+      )
+      toggle.addEventListener('click', () => this.openTeacherCodes(codes, open ? null : grade))
+      list.appendChild(toggle)
+
+      if (!open) continue
+
+      const table = make('div', 'display: grid; gap: 6px; margin: 2px 0 6px;')
+      for (const entry of codes[grade]) {
+        const line = make(
+          'div',
+          `
+            display: grid;
+            grid-template-columns: 2.2em 1fr auto;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            background: #ffffff;
+            border: 1px solid #d1dfeb;
+          `,
+        )
+        line.append(
+          make('span', 'font-weight: 900; color: #8a9bb0;', `${entry.lesson}.`),
+          make('span', 'font-weight: 700; line-height: 1.35;', `${entry.topic.icon} ${entry.topic.title}`),
+          make(
+            'span',
+            `
+              font-family: Consolas, 'Courier New', monospace;
+              font-size: 18px;
+              font-weight: 900;
+              letter-spacing: 2px;
+              color: #17406f;
+              padding: 4px 10px;
+              border-radius: 8px;
+              border: 1px solid #c9d6e4;
+              border-bottom-width: 3px;
+              background: #f6f9fc;
+            `,
+            entry.code,
+          ),
+        )
+        table.appendChild(line)
+      }
+      list.appendChild(table)
+    }
+    card.appendChild(list)
     this.footer(card)
   }
 

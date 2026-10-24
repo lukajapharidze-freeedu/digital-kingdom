@@ -84,7 +84,7 @@ export const GRADE_3_TOPICS: Topic[] = [
         picture: {
           joiner: '+',
           items: [
-            { icon: '🗄️', label: 'სისტემური ბლოკი' },
+            { icon: 'svg:tower', label: 'სისტემური ბლოკი' },
             { icon: '🖥️', label: 'მონიტორი' },
             { icon: '⌨️', label: 'კლავიატურა' },
             { icon: '🖱️', label: 'თაგვი' },
@@ -107,7 +107,7 @@ export const GRADE_3_TOPICS: Topic[] = [
           joiner: '→',
           items: [
             { icon: '⌨️', label: 'შემტანი' },
-            { icon: '🗄️', label: 'დამუშავება' },
+            { icon: 'svg:tower', label: 'დამუშავება' },
             { icon: '🖥️', label: 'გამომტანი' },
           ],
         },
@@ -1232,7 +1232,7 @@ export const GRADE_3_TOPICS: Topic[] = [
           joiner: '⇄',
           items: [
             { icon: '💻', label: 'ჩემი კომპიუტერი' },
-            { icon: '🗄️', label: 'სერვერი' },
+            { icon: 'svg:server', label: 'სერვერი' },
             { icon: '📱', label: 'სხვისი ტელეფონი' },
           ],
         },
@@ -1249,7 +1249,7 @@ export const GRADE_3_TOPICS: Topic[] = [
           items: [
             { icon: '👆', label: 'ვაწკაპუნებ' },
             { icon: '🛣️', label: 'მოთხოვნა მიდის' },
-            { icon: '🗄️', label: 'სერვერი' },
+            { icon: 'svg:server', label: 'სერვერი' },
             { icon: '🖼️', label: 'სურათი მოდის' },
           ],
         },
@@ -1593,7 +1593,7 @@ export const GRADE_3_TOPICS: Topic[] = [
             { icon: '📜', label: 'პაპირუსი' },
             { icon: '📄', label: 'ქაღალდი' },
             { icon: '📼', label: 'მაგნიტური ლენტი' },
-            { icon: '💾', label: 'მიკროჩიპი' },
+            { icon: 'svg:chip', label: 'მიკროჩიპი' },
             { icon: '☁️', label: 'ღრუბელი' },
           ],
         },
@@ -1610,7 +1610,7 @@ export const GRADE_3_TOPICS: Topic[] = [
           items: [
             { icon: '💻', label: 'ჩემი ფაილი' },
             { icon: '🌐', label: 'ინტერნეტი' },
-            { icon: '☁️🗄️', label: 'სერვერები' },
+            { icon: 'svg:server', label: 'სერვერები' },
           ],
         },
         body: [
@@ -1659,7 +1659,7 @@ export const GRADE_3_TOPICS: Topic[] = [
             { icon: '🎨', label: 'შემქმნელი' },
             { icon: '🌐', label: 'ინტერნეტი' },
             { icon: '📡', label: 'როუტერი' },
-            { icon: '🗄️', label: 'სერვერი N1' },
+            { icon: 'svg:server', label: 'სერვერი N1' },
           ],
         },
         body: [

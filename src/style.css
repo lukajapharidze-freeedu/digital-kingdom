@@ -762,7 +762,7 @@ kbd {
   gap: 14px;
 
   width: 100%;
-  max-width: 560px;
+  max-width: 700px;
 
   margin-bottom: 22px;
 }
@@ -898,6 +898,73 @@ kbd {
 
   transform:
     scale(1);
+}
+
+/* მასწავლებლის უჯრა და პაროლის ველი */
+
+.grade-card-teacher .grade-number {
+  font-size: 34px;
+}
+
+.grade-card-teacher .grade-label {
+  font-size: 13px;
+}
+
+.grade-card-teacher.selected {
+  border-color: #3d86c6;
+  background: #f1f7ff;
+}
+
+.grade-card-teacher.selected .grade-check {
+  background: #3d86c6;
+}
+
+.teacher-login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+
+  margin: -8px 0 18px;
+}
+
+.teacher-login[hidden] {
+  display: none;
+}
+
+.teacher-login-label {
+  color: #234b64;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.teacher-login-input {
+  width: 240px;
+  padding: 11px 14px;
+
+  border: 3px solid #b9d3ea;
+  border-radius: 14px;
+
+  background: white;
+  color: #234b64;
+
+  font-family: inherit;
+  font-size: 17px;
+  text-align: center;
+}
+
+.teacher-login-input:focus {
+  outline: none;
+  border-color: #3d86c6;
+}
+
+.teacher-login-error {
+  min-height: 20px;
+  margin: 0;
+
+  color: #b44c48;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 @media (

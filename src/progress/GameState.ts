@@ -70,6 +70,11 @@ function emptyData(): SessionData {
 export class GameState {
   private data: SessionData
   private readonly listeners = new Set<() => void>()
+  /**
+   * მასწავლებლის რეჟიმი: ყველა თემა და თამაში გახსნილია.
+   * მოსწავლის შენახულ პროგრესს არ ცვლის — მხოლოდ შედეგს "ზემოდან" ფარავს.
+   */
+  private teacher = false
 
   constructor() {
     this.data = this.load()
@@ -113,6 +118,16 @@ export class GameState {
     } catch {
       // შენახვა ვერ მოხერხდა (მაგ. სივრცე ამოიწურა) — თამაში მაინც გრძელდება
     }
+    for (const listener of this.listeners) listener()
+  }
+
+  get teacherMode(): boolean {
+    return this.teacher
+  }
+
+  setTeacherMode(on: boolean) {
+    if (this.teacher === on) return
+    this.teacher = on
     for (const listener of this.listeners) listener()
   }
 
@@ -197,7 +212,7 @@ export class GameState {
   // ---------- თამაშები ----------
 
   isGameUnlocked(id: string): boolean {
-    return this.data.unlockedGames.includes(id)
+    return this.teacher || this.data.unlockedGames.includes(id)
   }
 
   /** ხსნის თამაშს წიგნებით; true, თუ წიგნები ეყო და თამაში გაიხსნა */
@@ -218,7 +233,7 @@ export class GameState {
   }
 
   isTopicOpened(id: string): boolean {
-    return this.data.openedTopics.includes(id)
+    return this.teacher || this.data.openedTopics.includes(id)
   }
 
   openTopic(id: string) {
