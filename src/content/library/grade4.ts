@@ -906,7 +906,7 @@ export const GRADE_4_TOPICS: Topic[] = [
         picture: {
           items: [
             { icon: '☁️', label: 'ღრუბელი: ყველგან, თუ ინტერნეტია' },
-            { icon: '💾', label: 'ფლეშკა: ინტერნეტის გარეშე, მაგრამ შეიძლება დაიკარგოს' },
+            { icon: 'svg:usb', label: 'ფლეშკა: ინტერნეტის გარეშე, მაგრამ შეიძლება დაიკარგოს' },
           ],
         },
         body: [
@@ -1020,7 +1020,7 @@ export const GRADE_4_TOPICS: Topic[] = [
           items: [
             { icon: '🪶', label: 'ხელით წერა' },
             { icon: '🏭', label: 'სტამბა' },
-            { icon: '📠', label: 'საბეჭდი მანქანა' },
+            { icon: 'svg:typewriter', label: 'საბეჭდი მანქანა' },
             { icon: '💻', label: 'კომპიუტერი' },
           ],
         },
@@ -2063,7 +2063,7 @@ export const GRADE_4_TOPICS: Topic[] = [
             { icon: '🐂', label: 'გამოქვაბულის კედელი' },
             { icon: '📜', label: 'პაპირუსი' },
             { icon: '📚', label: 'წიგნი' },
-            { icon: '💾', label: 'დისკი, ფლეშკა' },
+            { icon: 'svg:usb', label: 'დისკი, ფლეშკა' },
             { icon: '☁️', label: 'ღრუბელი' },
           ],
         },

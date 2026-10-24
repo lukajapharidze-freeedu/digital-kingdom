@@ -1677,7 +1677,7 @@ export const GRADE_2_TOPICS: Topic[] = [
             { icon: '📝', label: 'MS Word' },
             { icon: '🎨', label: 'Paint 3D' },
             { icon: '📊', label: 'PowerPoint' },
-            { icon: '📷', label: 'ვებ-კამერა' },
+            { icon: 'svg:webcam', label: 'ვებ-კამერა' },
           ],
         },
         body: ['სკოლაში სხვადასხვა საქმისთვის სხვადასხვა პროგრამას ვიყენებთ:'],
@@ -2116,7 +2116,7 @@ export const GRADE_2_TOPICS: Topic[] = [
         picture: {
           items: [
             { icon: '📒', label: 'რვეული — ფიზიკური' },
-            { icon: '💾', label: 'ფლეშკა — ფიზიკური' },
+            { icon: 'svg:usb', label: 'ფლეშკა — ფიზიკური' },
             { icon: '☁️', label: 'ღრუბელი — ვირტუალური' },
           ],
         },

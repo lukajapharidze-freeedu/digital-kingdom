@@ -20,3 +20,24 @@ function cyrb53(str: string): number {
 export function hashTopicCode(code: string): string {
   return cyrb53(`kingdom:${code.trim().toUpperCase()}`).toString(36)
 }
+
+/** პაროლის ჰეში — დიდ და პატარა ასოებს არჩევს */
+export function hashSecret(secret: string): string {
+  return cyrb53(`teacher:${secret}`).toString(36)
+}
+
+/**
+ * მასწავლებლის კოდების დაშიფვრა/გაშიფვრა პაროლით (XOR). ერთი და იგივე ფუნქცია ორივე მიმართულებით მუშაობს:
+ * კოდი → hex და hex → კოდი. ასე კოდები თამაშის ფაილში ღიად არ ჩანს, მხოლოდ პაროლის შეყვანის შემდეგ.
+ */
+export function xorWithSecret(secret: string, salt: string, input: string, decode: boolean): string {
+  const key = (i: number) => cyrb53(`${secret}#${salt}#${i}`) & 0xff
+  if (decode) {
+    let out = ''
+    for (let i = 0; i < input.length / 2; i++) {
+      out += String.fromCharCode(parseInt(input.slice(i * 2, i * 2 + 2), 16) ^ key(i))
+    }
+    return out
+  }
+  return [...input].map((ch, i) => (ch.charCodeAt(0) ^ key(i)).toString(16).padStart(2, '0')).join('')
+}

@@ -13,7 +13,8 @@ async function main() {
     await showGradeSelect()
 
   new Game(
-    selection.grade
+    selection.grade,
+    selection.teacherCodes
   )
 }
 
