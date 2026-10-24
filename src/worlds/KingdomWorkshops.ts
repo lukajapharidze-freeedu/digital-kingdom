@@ -117,7 +117,9 @@ function bulbString(
 }
 
 export function buildMarket(ctx: BuildContext, parent: THREE.Object3D) {
-  const g = group(parent, -23, 0, 19)
+  const g = group(parent, -26, 0, 19)
+  // დახლების წინა მხარე (+z) აღმოსავლეთით, ბილიკისკენ
+  g.rotation.y = Math.PI / 2
 
   stall(ctx, g, -3, -3, 'fruit', 0xc95743)
   stall(ctx, g, 3, -3, 'potion', 0x347ec4)
@@ -152,7 +154,9 @@ export function buildMarket(ctx: BuildContext, parent: THREE.Object3D) {
 // სამჭედლო — ქვა, ხის კარკასი, გახურებული ღუმელი, კვამლი, ნაპერწკლები
 // ---------------------------------------------------------
 export function buildForge(ctx: BuildContext, parent: THREE.Object3D) {
-  const g = group(parent, 24, 0, 19)
+  const g = group(parent, 27.3, 0, 19)
+  // კარი (+z) დასავლეთით, ბილიკისკენ
+  g.rotation.y = -Math.PI / 2
   const forgeWindow = ctx.rig.tintedWindowMaterial('forge', 0xffb070, 0xff7a22)
   const fireMat = ctx.rig.glowMaterial('fire', 0xff7d22, 0xff4d00, 1.6, 3.2, 0.5)
 

@@ -22,7 +22,7 @@ export const GRADE_4_TOPICS: Topic[] = [
           items: [
             { icon: '🔋', label: 'წყარო' },
             { icon: '〰️', label: 'სადენი' },
-            { icon: '🔘', label: 'ჩამრთველი' },
+            { icon: 'svg:switch', label: 'ჩამრთველი' },
             { icon: '💡', label: 'ნათურა' },
           ],
           caption: 'წრე შეკრულია → ნათურა ანთია',
@@ -57,7 +57,7 @@ export const GRADE_4_TOPICS: Topic[] = [
         picture: {
           items: [
             { icon: '🔩', label: 'რკინა — გამტარი', mark: 'yes' },
-            { icon: '🥉', label: 'სპილენძი — გამტარი', mark: 'yes' },
+            { icon: 'svg:copper', label: 'სპილენძი — გამტარი', mark: 'yes' },
             { icon: '🌲', label: 'ხე — არ ატარებს', mark: 'no' },
             { icon: '🧤', label: 'რეზინი — არ ატარებს', mark: 'no' },
           ],
@@ -76,7 +76,7 @@ export const GRADE_4_TOPICS: Topic[] = [
             { icon: '🔋', label: 'ბატარეა' },
             { icon: '💡', label: 'ნათურა 1' },
             { icon: '💡', label: 'ნათურა 2' },
-            { icon: '🔘', label: '1 ჩამრთველი' },
+            { icon: 'svg:switch', label: '1 ჩამრთველი' },
           ],
         },
         body: [
@@ -628,7 +628,7 @@ export const GRADE_4_TOPICS: Topic[] = [
             { icon: '🗑️', label: 'წაშლილი ფაილები' },
             { icon: '📁', label: 'დოკუმენტები' },
             { icon: '🎵', label: 'მუსიკა' },
-            { icon: '🔢', label: 'გამოთვლა' },
+            { icon: 'svg:calculator', label: 'გამოთვლა' },
             { icon: '⚙️', label: 'მართვა' },
             { icon: '🛡️', label: 'დაცვა' },
           ],

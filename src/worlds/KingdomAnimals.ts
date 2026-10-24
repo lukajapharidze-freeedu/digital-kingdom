@@ -229,6 +229,21 @@ function blocked(x: number, z: number, r: number,
   return false
 }
 
+/** უახლოესი თავისუფალი წერტილი (x, z)-ის ირგვლივ, 4 ერთეულის რადიუსში */
+function freeSpot(x: number, z: number, r: number,
+  colliders: WorldCollider[], limit: number): { x: number; z: number } | null {
+  if (!blocked(x, z, r, colliders, limit)) return { x, z }
+  for (let d = 0.25; d <= 4; d += 0.25) {
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2
+      const nx = x + Math.cos(a) * d
+      const nz = z + Math.sin(a) * d
+      if (!blocked(nx, nz, r, colliders, limit)) return { x: nx, z: nz }
+    }
+  }
+  return null
+}
+
 export class KingdomAnimals {
   public readonly group = new THREE.Group()
   private readonly animals: Animal[] = []
@@ -244,14 +259,19 @@ export class KingdomAnimals {
       { species: 'horse', x: -12, z: -12, roam: 10 },
       { species: 'giraffe', x: 12, z: -12, roam: 8 },
       { species: 'raccoon', x: 11, z: 24, roam: 7 },
-      { species: 'sheep', x: -12, z: 25, roam: 7 },
+      // ცხვარი — მაღაზიასა და აკადემიას შორის მდელოზე
+      { species: 'sheep', x: -14, z: 6, roam: 6 },
     ]
     for (const entry of entries) {
       const radius = entry.species === 'giraffe' ? 1.1
         : entry.species === 'horse' ? 1.3
         : entry.species === 'sheep' ? 0.6
         : entry.species === 'raccoon' ? 0.35 : 0.325
-      if (blocked(entry.x, entry.z, radius, colliders, this.limit)) continue
+      // თუ საწყისი ადგილი დაკავებულია (სკამი, ფარანი...), უახლოეს თავისუფალ ადგილს ვეძებთ
+      const spot = freeSpot(entry.x, entry.z, radius, colliders, this.limit)
+      if (!spot) continue
+      entry.x = spot.x
+      entry.z = spot.z
       const model = entry.species === 'giraffe' || entry.species === 'raccoon' || entry.species === 'sheep'
         ? newAnimalModel(entry.species)
         : animalModel(entry.species)

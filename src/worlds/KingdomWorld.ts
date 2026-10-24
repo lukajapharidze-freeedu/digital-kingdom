@@ -11,7 +11,7 @@ import { buildCastle, buildKnowledgeTower, buildAcademy, buildLibrary } from './
 import { buildMarket, buildForge, buildTreasury, buildGate } from './KingdomWorkshops'
 
 export type KingdomBuildingId =
-  | 'knowledge' | 'academy' | 'library'
+  | 'academy' | 'library'
   | 'market' | 'forge' | 'treasury'
 
 export interface KingdomBuilding {
@@ -208,8 +208,9 @@ export function createKingdomWorld(): KingdomWorldData {
   colliders.push({ type: 'circle', x: -8, z: -32, radius: 2.1, height: 14 })
   colliders.push({ type: 'circle', x: 8, z: -32, radius: 2.1, height: 14 })
 
+  // ცოდნის კოშკი: მხოლოდ შენობაა (ინტერაქციის გარეშე)
   buildKnowledgeTower(ctx, root)
-  register('knowledge', 'ცოდნის კოშკი', -29, -17, 5.6, 5.6, 11)
+  colliders.push({ type: 'box', x: -29, z: -17, halfWidth: 2.8, halfDepth: 2.8, height: 15 })
 
   buildAcademy(ctx, root)
   register('academy', 'აკადემია', -21, -21, 8, 7, 7)
@@ -217,22 +218,44 @@ export function createKingdomWorld(): KingdomWorldData {
   buildLibrary(ctx, root)
   register('library', 'ბიბლიოთეკა', 23, -19, 9, 7, 5.2)
 
+  // მაღაზია: დახლები აღმოსავლეთით, ბილიკისკენ (x = -19) იყურება
   buildMarket(ctx, root)
   buildings.push({
     id: 'market', name: 'მაღაზია',
-    position: new THREE.Vector3(-23, 0, 25), interactionRadius: 3,
+    position: new THREE.Vector3(-19.6, 0, 19), interactionRadius: 3,
   })
-  for (const x of [-26, -20]) {
-    for (const z of [-3, 3]) {
+  for (const sx of [-3, 3]) {
+    for (const sz of [-3, 3]) {
+      // დახლის ცენტრი (sx, sz + 0.2) 90°-ით შემობრუნებული: x ← z, z ← -x
       colliders.push({
-        type: 'box', x, z: 19 + z,
-        halfWidth: 1.9, halfDepth: 1.5, height: 3.5,
+        type: 'box', x: -26 + sz + 0.2, z: 19 - sx,
+        halfWidth: 1.5, halfDepth: 1.9, height: 3.5,
       })
     }
   }
 
+  // ბაზრის კასრები, ყუთი და ტომრები (ადგილობრივი (x, z) → (-26 + z, 19 - x))
+  for (const [x, z, radius, height] of [
+    [-27.5, 25, 0.5, 1.0], [-26.4, 25.6, 0.5, 1.0], [-23.8, 12.9, 0.5, 1.0],
+    [-26.6, 12.8, 0.6, 1.6], [-25.3, 12.5, 0.45, 0.9], [-24, 25.3, 0.45, 0.9],
+  ]) {
+    colliders.push({ type: 'circle', x, z, radius, height })
+  }
+
+  // სამჭედლო: კარი დასავლეთით, ბილიკისკენ (x = 19)
   buildForge(ctx, root)
-  register('forge', 'სამჭედლო', 24, 19, 9, 7, 6)
+  buildings.push({
+    id: 'forge', name: 'სამჭედლო',
+    position: new THREE.Vector3(20, 0, 19), interactionRadius: 2.8,
+  })
+  colliders.push({ type: 'box', x: 27.3, z: 19, halfWidth: 3.5, halfDepth: 4.5, height: 10 })
+  // სამჭედლოს ეზო: ღუმელი, გრდემლი, კასრი, სალესი ბორბალი, ნახშირი (ადგილობრივი (x, z) → (27.3 - z, 19 + x))
+  colliders.push({ type: 'box', x: 23.3, z: 21.5, halfWidth: 0.6, halfDepth: 1.4, height: 5 })
+  for (const [x, z, radius, height] of [
+    [22.4, 17.3, 0.6, 1.4], [21.6, 14.7, 0.55, 1.0], [22.9, 14.1, 0.6, 1.4], [22.1, 23.55, 0.4, 0.6],
+  ]) {
+    colliders.push({ type: 'circle', x, z, radius, height })
+  }
 
   buildTreasury(ctx, root)
   register('treasury', 'საგანძურის საცავი', 30, -2, 7, 7, 5.7)
@@ -265,7 +288,9 @@ export function createKingdomWorld(): KingdomWorldData {
     if (Math.abs(x) < 8 && (z > 26 || z < -26)) continue
     if (x < -24 && z > 9 && z < 28) continue
     if (x > 20 && z > 9 && z < 28) continue
-    bush(root, x, z, 0.8 + (i % 3) * 0.2, i % 3 === 0)
+    const scale = 0.8 + (i % 3) * 0.2
+    bush(root, x, z, scale, i % 3 === 0)
+    colliders.push({ type: 'circle', x, z, radius: 0.6 * scale, height: 0.9 })
   }
 
   // ---------- მცურავი პატარა კუნძულები ----------
@@ -290,7 +315,7 @@ export function createKingdomWorld(): KingdomWorldData {
     })
   })
 
-  decorateKingdom(root, rig)
+  decorateKingdom(root, rig, colliders)
 
   // წარმადობა: პატარა დეტალები ჩრდილს აღარ ქმნის
   root.traverse((obj: THREE.Object3D) => {

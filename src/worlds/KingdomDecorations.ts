@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { NightRig } from './KingdomNight'
+import type { WorldCollider } from '../game/Collision'
 
 const material = (color: number, emissive = 0) =>
   new THREE.MeshStandardMaterial({
@@ -117,15 +118,24 @@ function flag(parent: THREE.Group, x: number, z: number, color: number) {
     warmLight, x, 5.1, z)
 }
 
-export function decorateKingdom(parent: THREE.Group, rig: NightRig) {
+export function decorateKingdom(parent: THREE.Group, rig: NightRig, colliders: WorldCollider[]) {
+  // ფარნები, სკამები, აბრები, დროშები და ქვები — გმირი და ცხოველები მათში ვეღარ გადიან
+  const post = (x: number, z: number, radius: number, height: number) => {
+    colliders.push({ type: 'circle', x, z, radius, height })
+  }
+
   // The entrance avenue stays clear for the player.
   for (const z of [8, 16, 24, 31]) {
     lantern(parent, -4.3, z, rig)
     lantern(parent, 4.3, z, rig)
+    post(-4.3, z, 0.3, 4.4)
+    post(4.3, z, 0.3, 4.4)
   }
   for (const z of [-9, -17, -25]) {
     lantern(parent, -4.3, z, rig)
     lantern(parent, 4.3, z, rig)
+    post(-4.3, z, 0.3, 4.4)
+    post(4.3, z, 0.3, 4.4)
   }
 
   for (const [x, z, rotation] of [
@@ -134,6 +144,8 @@ export function decorateKingdom(parent: THREE.Group, rig: NightRig) {
     [-10, 25, 0], [10, 25, Math.PI],
   ]) {
     bench(parent, x, z, rotation)
+    // სკამი x-ის გასწვრივაა (0 ან 180°); დაბალია, ამიტომ ზედ გადახტომა შეიძლება
+    colliders.push({ type: 'box', x, z, halfWidth: 1.2, halfDepth: 0.45, height: 1.0 })
   }
 
   // Small flower beds around the central plaza and side paths.
@@ -172,16 +184,20 @@ export function decorateKingdom(parent: THREE.Group, rig: NightRig) {
   // Decorative banners on the kingdom entrance.
   flag(parent, -8.7, 36, 0x4789d0)
   flag(parent, 8.7, 36, 0xf1ba43)
+  post(-8.7, 36, 0.2, 5)
+  post(8.7, 36, 0.2, 5)
 
   // Name signs sit on the approach side of each building.
-  sign(parent, 'ცოდნის კოშკი', -29, -12.3)
   sign(parent, 'აკადემია', -21, -15.2)
   sign(parent, 'ბიბლიოთეკა', 23, -13.3)
-  sign(parent, 'მაღაზია', -23, 27.4)
-  sign(parent, 'სამჭედლო', 24, 24.8)
+  sign(parent, 'მაღაზია', -21.8, 26.2)
+  sign(parent, 'სამჭედლო', 21.8, 25.2)
   sign(parent, 'საგანძურის საცავი', 30, 3.5)
+  for (const [x, z] of [[-21, -15.2], [23, -13.3], [-21.8, 26.2], [21.8, 25.2], [30, 3.5]]) {
+    post(x, z, 0.2, 2.8)
+  }
 
-  // Gentle decorative rocks in the lawns (no gameplay collision).
+  // Gentle decorative rocks in the lawns (low — the player can jump over them).
   for (const [x, z] of [
     [-15, 28], [15, 29], [-32, 12], [34, 14],
     [-13, -30], [14, -30], [-35, -4], [35, -13],
@@ -189,5 +205,6 @@ export function decorateKingdom(parent: THREE.Group, rig: NightRig) {
     const rock = addMesh(parent, new THREE.DodecahedronGeometry(0.58, 0),
       stone, x, 0.38, z)
     rock.scale.set(1.3, 0.65, 0.95)
+    post(x, z, 0.7, 0.75)
   }
 }
