@@ -26,6 +26,8 @@ interface NetPlayer {
   finishMs: number | null
   place: number | null
   points: number
+  stageSteps: number
+  stageBonus: number
   left: boolean
 }
 
@@ -206,6 +208,13 @@ const STYLE = `
   }
   .tc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
   .tc-prog { font-size: 12px; opacity: .9; white-space: nowrap; }
+  .tc-timer {
+    position: absolute; top: 46px; left: 50%; transform: translateX(-50%); z-index: 2;
+    padding: 6px 18px; border-radius: 16px; background: rgba(230, 50, 60, .88); color: #fff;
+    font-weight: 900; font-size: 22px; text-align: center; box-shadow: 0 6px 16px rgba(0,0,0,.25);
+    pointer-events: none;
+  }
+  .tc-timer b { font-size: 34px; }
   .tc-stage3d .tc-ticker { position: absolute; top: 12px; left: 0; right: 0; z-index: 1; pointer-events: none; }
   .tc-ticker {
     min-height: 34px; padding: 0 12px; text-align: center; color: #fff; font-weight: 900; font-size: 18px;
@@ -479,6 +488,7 @@ export class TypingChampion {
       `<div class="tc-stage3d">
          <div class="tc-standings"></div>
          <div class="tc-ticker"></div>
+         <div class="tc-timer" hidden></div>
        </div>
        <div class="tc-typing">
          <div class="tc-text">${chars}</div>
@@ -527,7 +537,7 @@ export class TypingChampion {
       const isHost = room.hostId === this.myId
       html = `<div class="tc-card">
         <h2>🏆 ჩემპიონი: ${escapeHtml(champion?.name ?? '')}!</h2>
-        <p>ყველა ეტაპის ქულების ჯამი (1 ადგილი = 4 ქულა, 2 = 3, 3 = 2, 4 = 1):</p>
+        <p>ყველა ეტაპის ქულების ჯამი: ყოველი გავლილი საფეხური = 1 ქულა, ფინიშის ბონუსი 5 / 3 / 2 / 1.</p>
         <ul class="tc-results">${rows}</ul>
         <div class="tc-row">
           ${isHost ? '<button class="tc-btn tc-green" data-again type="button">🔁 ხელახლა თამაში</button>' : '<p>მასპინძელს შეუძლია ახალი რბოლის დაწყება.</p>'}
@@ -545,8 +555,9 @@ export class TypingChampion {
             p.place !== null
               ? `${((p.finishMs ?? 0) / 1000).toFixed(1)} წმ`
               : `ვერ მოასწრო (${Math.round((p.chars / total) * 100)}%)`
+          const earned = `+${p.stageSteps + p.stageBonus} (${p.stageSteps} საფეხური${p.stageBonus ? ` + ${p.stageBonus} ბონუსი` : ''})`
           return `<li><span class="tc-medal">${p.place ? MEDALS[p.place - 1] : '⏱️'}</span><span class="tc-dot" style="background:${LANE_COLORS[p.lane]}"></span>
-            ${escapeHtml(p.name)} <span class="tc-small">${result}</span><span class="tc-score">${p.points} ქულა</span></li>`
+            ${escapeHtml(p.name)} <span class="tc-small">${result} · ${earned}</span><span class="tc-score">${p.points} ქულა</span></li>`
         })
         .join('')
       const next = vehicleFor(room.stage + 1)
@@ -725,13 +736,15 @@ export class TypingChampion {
         const el = this.body.querySelector('[data-stat="wpm"]')
         if (el) el.textContent = String(Math.round(doneWords / minutes))
       }
-      if (this.hurryUntil > 0 && me?.place === null) {
+      // პირველი ფინიშის შემდეგ ყველას უჩანს წამზომი
+      const timerEl = this.body.querySelector<HTMLDivElement>('.tc-timer')
+      if (timerEl && this.hurryUntil > 0) {
         const left = Math.max(0, Math.ceil((this.hurryUntil - now) / 1000))
-        const ticker = this.body.querySelector<HTMLDivElement>('.tc-ticker')
-        if (ticker && left <= 15) {
-          ticker.textContent = `⏱️ ${left} წამი დარჩა — იჩქარე!`
-          ticker.style.opacity = '1'
-        }
+        timerEl.hidden = false
+        timerEl.innerHTML =
+          me?.place === null
+            ? `⏱️ <b>${left}</b> წამი დარჩა — იჩქარე!`
+            : `⏱️ სხვებს რჩება <b>${left}</b> წამი`
       }
     }
 

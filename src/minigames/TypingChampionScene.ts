@@ -1,7 +1,8 @@
 /**
  * Typing Champion — 3D "კუბიკების" სამყარო (Three.js).
  *
- * კიბე ცაში, მზის ჩასვლა, კუბიკის ღრუბლები, ხეები და შორს ქალაქი.
+ * კიბე ცაში მფრინავ კუნძულებს შორის: ღია, ციფრული ცა, ღრუბლების ზღვა ქვემოთ,
+ * მოლივლივე მბზინავი კუბიკები და 0/1 ბიტები.
  * ყოველი საფეხური ერთი სიტყვაა: რამდენ სიტყვასაც დაბეჭდავ, იმდენ საფეხურზე ადის შენი გმირი.
  * გმირები ორიგინალური კუბიკის კაცუნებია (ლაბადით, ნიღბით, ემბლემით), ყოველ ეტაპზე სხვა ტრანსპორტით.
  */
@@ -52,7 +53,7 @@ function pixelCanvas(size: number, draw: (put: (x: number, y: number, c: string)
 
 const pick = (r: () => number, list: string[]) => list[Math.floor(r() * list.length)]
 
-type BlockKind = 'grass' | 'grassSide' | 'dirt' | 'stone' | 'brick' | 'planks' | 'log' | 'leaves' | 'window'
+type BlockKind = 'grass' | 'grassSide' | 'dirt' | 'stone' | 'brick' | 'planks' | 'log' | 'leaves'
 
 function blockCanvas(kind: BlockKind): HTMLCanvasElement {
   const greens = ['#5fae3a', '#6cbc43', '#57a234', '#78c64c', '#4f9a2f']
@@ -93,11 +94,6 @@ function blockCanvas(kind: BlockKind): HTMLCanvasElement {
           case 'leaves':
             c = r() < 0.12 ? '#2d5a1c' : pick(r, ['#3f8a2c', '#4b9a33', '#367a25', '#56a83b'])
             break
-          case 'window': {
-            const isWin = x % 4 !== 0 && y % 4 !== 0
-            c = isWin ? (r() < 0.55 ? '#ffd76a' : '#2a3350') : '#1c2238'
-            break
-          }
         }
         put(x, y, c)
       }
@@ -131,10 +127,7 @@ class Textures {
     const key = `${kind}:${rx.toFixed(2)}:${ry.toFixed(2)}`
     let material = this.cache.get(key)
     if (!material) {
-      material =
-        kind === 'window'
-          ? new THREE.MeshLambertMaterial({ color: 0x5a6290, map: this.texture(kind, rx, ry), emissive: 0xffffff, emissiveMap: this.texture(kind, rx, ry), emissiveIntensity: 0.45 })
-          : new THREE.MeshLambertMaterial({ map: this.texture(kind, rx, ry), transparent: kind === 'leaves', alphaTest: 0 })
+      material = new THREE.MeshLambertMaterial({ map: this.texture(kind, rx, ry) })
       this.cache.set(key, material)
       this.owned.push(material)
     }
@@ -497,6 +490,7 @@ export class TypingChampionScene {
   private racers = new Map<number, Racer>()
   private panels: { mat: THREE.MeshBasicMaterial; mesh: THREE.Mesh }[] = []
   private clouds: THREE.Group[] = []
+  private floaters: { obj: THREE.Object3D; baseY: number; phase: number; spin: number }[] = []
   private steps = 0
   private vehicle: VehicleKind = 'foot'
   private myId = 0
@@ -544,13 +538,13 @@ export class TypingChampionScene {
     this.myWord = -1
 
     const scene = this.scene
-    scene.background = new THREE.Color(0xf2b07e)
+    scene.background = new THREE.Color(0xdcefff)
     this.sky = this.skyDome()
     scene.add(this.sky)
-    scene.fog = new THREE.Fog(0xf2b07e, 70, 420)
+    scene.fog = new THREE.Fog(0xdcefff, 60, 300)
 
-    scene.add(new THREE.HemisphereLight(0xcfe2ff, 0x7a5a3a, 1.1))
-    const sun = new THREE.DirectionalLight(0xffd9a8, 2.2)
+    scene.add(new THREE.HemisphereLight(0xeaf6ff, 0x8a9ab8, 1.35))
+    const sun = new THREE.DirectionalLight(0xfff1d6, 2.0)
     sun.castShadow = true
     sun.shadow.mapSize.set(2048, 2048)
     const sc = sun.shadow.camera
@@ -580,16 +574,16 @@ export class TypingChampionScene {
     this.camera.position.set(fx + 16, 14, 30)
   }
 
-  /** ცის გუმბათი: ზემოთ ლურჯი, ჰორიზონტთან მზის ჩასვლის ნარინჯისფერი */
+  /** ცის გუმბათი: ზემოთ ღია ლურჯი, ჰორიზონტთან ვარდისფერ-იისფერი, ქვემოთ ღრუბლის თეთრი */
   private skyDome() {
     const geometry = new THREE.SphereGeometry(380, 32, 16)
     const stops: [number, THREE.Color][] = [
-      [-1, new THREE.Color(0xf5b77e)],
-      [0, new THREE.Color(0xffc98a)],
-      [0.08, new THREE.Color(0xf79a68)],
-      [0.22, new THREE.Color(0xb889c4)],
-      [0.45, new THREE.Color(0x5f86d8)],
-      [1, new THREE.Color(0x2c58bd)],
+      [-1, new THREE.Color(0xeef7ff)],
+      [-0.05, new THREE.Color(0xe4f2ff)],
+      [0.04, new THREE.Color(0xffe3f1)],
+      [0.16, new THREE.Color(0xd9d6ff)],
+      [0.42, new THREE.Color(0x9fd4ff)],
+      [1, new THREE.Color(0x5aa9f0)],
     ]
     const pos = geometry.attributes.position
     const colors = new Float32Array(pos.count * 3)
@@ -646,7 +640,7 @@ export class TypingChampionScene {
     // რამდენიმე სვეტი წყლამდე
     for (let i = 6; i < n - 2; i += 8) {
       const top = this.stepTop(i) - 1
-      const h = top + 14
+      const h = top + 6
       for (const side of [1, -1]) {
         const pillar = voxelBox(tx, 0.9, h, 0.9, 'brick', 'brick', 'brick', 0.9)
         pillar.position.set((i + 0.5) * STEP_D, top - h / 2, side * (HALF_W - 0.1))
@@ -657,8 +651,8 @@ export class TypingChampionScene {
 
   private addPanel(word: string, x: number, y: number, z: number) {
     const tex = textCanvas(512, 160, (ctx) => {
-      ctx.fillStyle = 'rgba(70, 200, 255, 0.28)'
-      ctx.strokeStyle = 'rgba(200, 245, 255, 0.95)'
+      ctx.fillStyle = 'rgba(30, 90, 190, 0.78)'
+      ctx.strokeStyle = 'rgba(150, 230, 255, 1)'
       ctx.lineWidth = 8
       ctx.beginPath()
       ctx.roundRect(8, 8, 496, 144, 18)
@@ -701,9 +695,17 @@ export class TypingChampionScene {
     grass.position.set((x0 + x1) / 2, top - 0.5, (z0 + z1) / 2)
     const dirt = voxelBox(tx, w, 2, d, 'dirt')
     dirt.position.set((x0 + x1) / 2, top - 2, (z0 + z1) / 2)
-    const rock = voxelBox(tx, w - 2, depth, d - 2, 'stone')
-    rock.position.set((x0 + x1) / 2, top - 3 - depth / 2, (z0 + z1) / 2)
-    this.scene.add(grass, dirt, rock)
+    const layers = 3
+    const layerH = depth / layers
+    for (let i = 0; i < layers; i++) {
+      const shrink = 1 + i * Math.min(w, d) * 0.14
+      const lw = Math.max(1, w - shrink * 2)
+      const ld = Math.max(1, d - shrink * 2)
+      const rock = voxelBox(tx, lw, layerH, ld, i === 0 ? 'dirt' : 'stone')
+      rock.position.set((x0 + x1) / 2, top - 3 - layerH * (i + 0.5), (z0 + z1) / 2)
+      this.scene.add(rock)
+    }
+    this.scene.add(grass, dirt)
   }
 
   private buildStart() {
@@ -788,51 +790,103 @@ export class TypingChampionScene {
   }
 
   private buildBackdrop() {
-    const tx = this.textures
     const mid = (this.steps * STEP_D) / 2
+    const r = rng(42)
 
-    // წყალი
-    const waterMat = new THREE.MeshLambertMaterial({ color: 0x3f7fd0, emissive: 0x1a3a70, emissiveIntensity: 0.4 })
-    this.owned.push(waterMat)
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), waterMat)
-    water.rotation.x = -Math.PI / 2
-    water.position.set(mid, -12, -60)
-    water.receiveShadow = true
-    this.scene.add(water)
-
-    // მზე — დიდი კვადრატი ჰორიზონტზე
-    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfff6d0, fog: false })
-    const haloMat = new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.35, fog: false })
+    // მზე — ღია კვადრატი ცაში
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xfffbe8, fog: false })
+    const haloMat = new THREE.MeshBasicMaterial({ color: 0xfff1b8, transparent: true, opacity: 0.4, fog: false })
     this.owned.push(sunMat, haloMat)
-    const sunQuad = new THREE.Mesh(new THREE.PlaneGeometry(26, 26), sunMat)
-    const halo = new THREE.Mesh(new THREE.PlaneGeometry(44, 44), haloMat)
+    const sunQuad = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), sunMat)
+    const halo = new THREE.Mesh(new THREE.PlaneGeometry(38, 38), haloMat)
     this.sunQuad = new THREE.Group()
     halo.position.z = -1
     this.sunQuad.add(sunQuad, halo)
     this.scene.add(this.sunQuad)
-    this.sun.position.set(mid + 40, 40, -60)
 
-    // შორეული ქალაქი
-    const r = rng(42)
-    for (let i = 0; i < 64; i++) {
-      if (r() < 0.25) continue
-      const w = 5 + r() * 7
-      const h = 6 + r() * 22 * (0.3 + Math.sin((i / 64) * Math.PI))
-      const d = 5 + r() * 6
-      const b = voxelBox(tx, w, h, d, 'window', 'stone', 'stone', 2)
-      b.castShadow = false
-      b.position.set(mid - 150 + i * 4.8 + r() * 2, -12 + h / 2, -230 - r() * 40)
-      this.scene.add(b)
+    // ღრუბლების ზღვა ქვემოთ და ციფრული ბადე მის ქვეშ
+    const seaMat = new THREE.MeshLambertMaterial({ color: 0xd6ebff, emissive: 0xb8d8ff, emissiveIntensity: 0.4, transparent: true, opacity: 0.7 })
+    this.owned.push(seaMat)
+    const sea = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), seaMat)
+    sea.rotation.x = -Math.PI / 2
+    sea.position.set(mid, -34, -80)
+    this.scene.add(sea)
+    const grid = new THREE.GridHelper(700, 70, 0x4fb6ff, 0x7cc8ff)
+    grid.position.set(mid, -33.5, -80)
+    const gridMat = grid.material as THREE.LineBasicMaterial
+    gridMat.transparent = true
+    gridMat.opacity = 0.45
+    this.owned.push(gridMat)
+    this.scene.add(grid)
+
+    // შორეული მფრინავი კუნძულები
+    const islands: [number, number, number, number, number][] = [
+      [-60, -70, 4, 9, 1],
+      [-20, -110, -6, 12, 1],
+      [25, -80, 8, 8, 0],
+      [70, -120, -2, 14, 1],
+      [110, -75, 6, 9, 1],
+      [150, -115, 12, 11, 0],
+      [-40, -160, 18, 16, 1],
+    ]
+    for (const [ox, oz, oy, size, hasTree] of islands) {
+      const x = mid + ox - 40
+      this.island(x - size / 2, x + size / 2, oz - size / 2, oz + size / 2, oy, size * 0.7)
+      if (hasTree) this.tree(x, oy, oz, 3 + Math.round(r() * 2))
     }
-    // მწვანე კუნძულები ქალაქამდე
-    this.island(mid - 70, mid - 40, -70, -50, -6, 4)
-    this.tree(mid - 60, -6, -60, 4)
-    this.island(mid + 30, mid + 52, -62, -46, -8, 4)
 
-    // კუბიკის ღრუბლები
-    const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xffd9c0, emissiveIntensity: 0.25, transparent: true, opacity: 0.92 })
+    // მოლივლივე მბზინავი კუბიკები — "მონაცემები"
+    const glowColors = [0x5ee0ff, 0x9d8bff, 0x6fffc8, 0xff9bd9]
+    const glowMats = glowColors.map((c) => {
+      const m = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.55 })
+      this.owned.push(m)
+      return m
+    })
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
+    this.owned.push(edgeMat)
+    for (let i = 0; i < 46; i++) {
+      const size = 0.5 + r() * 1.4
+      const geometry = new THREE.BoxGeometry(size, size, size)
+      const cube = new THREE.Mesh(geometry, glowMats[i % glowMats.length])
+      cube.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry), edgeMat))
+      const near = i < 22
+      cube.position.set(
+        mid - 70 + r() * 160,
+        (near ? 4 : -6) + r() * (near ? 22 : 34),
+        near ? -10 - r() * 30 : -45 - r() * 90
+      )
+      cube.rotation.set(r() * 3, r() * 3, 0)
+      this.scene.add(cube)
+      this.floaters.push({ obj: cube, baseY: cube.position.y, phase: r() * 10, spin: 0.2 + r() * 0.5 })
+    }
+
+    // 0 და 1 ბიტები ჰაერში
+    for (const bit of ['0', '1']) {
+      const tex = textCanvas(64, 64, (ctx) => {
+        ctx.font = '900 54px Consolas, monospace'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.shadowColor = '#5ee0ff'
+        ctx.shadowBlur = 10
+        ctx.fillStyle = '#ffffff'
+        ctx.fillText(bit, 32, 34)
+      })
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.85, depthWrite: false })
+      this.owned.push(tex, mat)
+      for (let i = 0; i < 18; i++) {
+        const sprite = new THREE.Sprite(mat)
+        const size = 0.8 + r() * 1.2
+        sprite.scale.set(size, size, 1)
+        sprite.position.set(mid - 60 + r() * 140, 2 + r() * 26, -8 - r() * 60)
+        this.scene.add(sprite)
+        this.floaters.push({ obj: sprite, baseY: sprite.position.y, phase: r() * 10, spin: 0 })
+      }
+    }
+
+    // რბილი კუბიკის ღრუბლები
+    const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xeaf4ff, emissiveIntensity: 0.45, transparent: true, opacity: 0.9 })
     this.owned.push(cloudMat)
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 16; i++) {
       const cloud = new THREE.Group()
       const parts = 3 + Math.floor(r() * 4)
       for (let p = 0; p < parts; p++) {
@@ -840,7 +894,8 @@ export class TypingChampionScene {
         piece.position.set(r() * 10 - 5, r() * 1.5, r() * 6 - 3)
         cloud.add(piece)
       }
-      cloud.position.set(mid - 80 + r() * 200, 22 + r() * 22, -30 - r() * 90)
+      const low = i % 3 === 0
+      cloud.position.set(mid - 80 + r() * 200, low ? -18 - r() * 8 : 22 + r() * 22, -30 - r() * 100)
       this.scene.add(cloud)
       this.clouds.push(cloud)
     }
@@ -997,6 +1052,11 @@ export class TypingChampionScene {
 
     for (const r of this.racers.values()) this.placeRacer(r, dt)
     for (const [i, c] of this.clouds.entries()) c.position.x += dt * (0.4 + (i % 3) * 0.2)
+    for (const f of this.floaters) {
+      f.obj.position.y = f.baseY + Math.sin(this.time * 0.8 + f.phase) * 0.6
+      f.obj.rotation.y += dt * f.spin
+      f.obj.rotation.x += dt * f.spin * 0.5
+    }
 
     // კამერა ჩემს გმირს მისდევს, ცოტა წინ იყურება
     const me = this.racers.get(this.myId)
@@ -1041,6 +1101,7 @@ export class TypingChampionScene {
     this.racers.clear()
     this.panels = []
     this.clouds = []
+    this.floaters = []
     this.steps = 0
   }
 
