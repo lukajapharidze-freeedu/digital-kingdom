@@ -4,10 +4,13 @@
  * ერთი მოთამაშე ქმნის ოთახს და იღებს 4-ნიშნა კოდს, დანარჩენები კოდით უერთდებიან.
  * ყოველ ეტაპზე ტექსტი 5 სიტყვით იზრდება (15, 20, 25...) და მრბოლელი ფორმას იცვლის:
  * ფეხით → მანქანა → მოტოციკლი → რაკეტა → მფრინავი თეფში.
+ * რბოლა 3D კუბიკების სამყაროში მიმდინარეობს: ყოველი სიტყვა კიბის ერთი საფეხურია (TypingChampionScene).
  *
  * კავშირი მიდის მასპინძლის კომპიუტერზე გაშვებულ რელეზე (server/typingChampionRelay.mjs),
  * რომელიც `npm run lan`-ით ირთვება. Vercel-ზე რელე არ არის — მაშინ თამაში ამას გვეუბნება.
  */
+
+import { TypingChampionScene, type VehicleKind } from './TypingChampionScene'
 
 export interface TypingChampionOptions {
   onClose?: () => void
@@ -44,13 +47,11 @@ type ServerMessage =
   | { t: 'hurry'; seconds: number }
   | { t: 'error'; msg: string }
 
-type VehicleKind = 'foot' | 'car' | 'moto' | 'rocket' | 'ufo'
-
 const WS_PATH = '/typing-champion-ws'
 const FIRST_STAGE_WORDS = 15
 const WORDS_PER_STAGE_STEP = 5
 const RESULTS_SECONDS = 6
-const LANE_COLORS = ['#ff5a5f', '#3fa7ff', '#ffc93c', '#5ad17a']
+const LANE_COLORS = ['#e8443a', '#2f86e8', '#f3b81f', '#3fbf5a']
 const MEDALS = ['🥇', '🥈', '🥉', '🏅']
 
 const VEHICLES: { kind: VehicleKind; name: string; icon: string }[] = [
@@ -114,74 +115,6 @@ function makeStageText(stage: number): string {
 
 function vehicleFor(stage: number) {
   return VEHICLES[stage % VEHICLES.length]
-}
-
-/** მრბოლელის SVG (მარჯვნივ იყურება); მთავარი ფერი = currentColor */
-function vehicleSvg(kind: VehicleKind): string {
-  const wheel = (cx: number, cy: number, r: number) => `
-    <g class="tc-wheel" style="transform-origin:${cx}px ${cy}px">
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="#222" stroke="#111" stroke-width="1.5"/>
-      <circle cx="${cx}" cy="${cy}" r="${r * 0.45}" fill="#ccc"/>
-      <path d="M${cx - r * 0.8} ${cy}H${cx + r * 0.8}M${cx} ${cy - r * 0.8}V${cy + r * 0.8}" stroke="#888" stroke-width="1.4"/>
-    </g>`
-  switch (kind) {
-    case 'foot':
-      return `<svg viewBox="0 0 80 50" aria-hidden="true">
-        <g class="tc-leg tc-leg-b"><path d="M40 31 L47 46 L52 46" stroke="#2c3e66" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
-        <g class="tc-arm tc-arm-b"><path d="M42 19 L35 27" stroke="#c98a5a" stroke-width="4" stroke-linecap="round"/></g>
-        <path d="M44 15 L40 31" stroke="currentColor" stroke-width="9" stroke-linecap="round"/>
-        <g class="tc-leg tc-leg-a"><path d="M40 31 L34 46 L39 46" stroke="#3b5288" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
-        <g class="tc-arm tc-arm-a"><path d="M43 19 L51 25" stroke="#e0a172" stroke-width="4" stroke-linecap="round"/></g>
-        <circle cx="46" cy="8" r="6.5" fill="#f2c08f" stroke="#7a4a26" stroke-width="1.5"/>
-        <path d="M40 6 Q46 -1 52 5 L52 7 L40 7 Z" fill="currentColor"/>
-        <path d="M14 22H28M10 30H26M16 38H30" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity=".7" class="tc-speed"/>
-      </svg>`
-    case 'car':
-      return `<svg viewBox="0 0 80 50" aria-hidden="true">
-        <path d="M10 34 Q10 26 18 25 L28 24 L36 14 Q38 12 42 12 L56 12 Q60 12 62 16 L67 25 Q74 26 75 33 L75 37 L10 37 Z" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="1.6" stroke-linejoin="round"/>
-        <path d="M38 16 L44 16 L44 24 L32 24 Z M47 16 L57 16 Q59 16 60 18 L63 24 L47 24 Z" fill="#cfefff" stroke="rgba(0,0,0,.3)" stroke-width="1"/>
-        <rect x="70" y="28" width="5" height="4" rx="1" fill="#fff6a8"/>
-        <rect x="10" y="29" width="4" height="3" rx="1" fill="#ff3b3b"/>
-        ${wheel(24, 38, 7)}${wheel(61, 38, 7)}
-        <path d="M0 26H8M2 33H8" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity=".7" class="tc-speed"/>
-      </svg>`
-    case 'moto':
-      return `<svg viewBox="0 0 80 50" aria-hidden="true">
-        ${wheel(18, 38, 9)}${wheel(62, 38, 9)}
-        <path d="M18 38 L32 26 L50 26 L62 38" stroke="#444" stroke-width="3" fill="none" stroke-linejoin="round"/>
-        <path d="M28 26 Q30 19 40 19 L52 19 Q56 20 55 26 Z" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="1.4"/>
-        <path d="M54 21 L60 12 L64 12" stroke="#333" stroke-width="3" fill="none" stroke-linecap="round"/>
-        <path d="M38 19 L34 7 L44 8 L46 19 Z" fill="#2c3e66"/>
-        <circle cx="40" cy="5" r="6" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="1.4"/>
-        <path d="M41 3 H47 V7 H42 Z" fill="#cfefff"/>
-        <path d="M44 10 L56 14" stroke="#2c3e66" stroke-width="4" stroke-linecap="round"/>
-        <path d="M0 24H8M2 32H6" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" opacity=".7" class="tc-speed"/>
-      </svg>`
-    case 'rocket':
-      return `<svg viewBox="0 0 80 50" aria-hidden="true">
-        <g class="tc-flame">
-          <path d="M18 19 Q2 25 18 31 Q10 25 18 19 Z" fill="#ffb238"/>
-          <path d="M18 21 Q8 25 18 29 Z" fill="#fff1a8"/>
-        </g>
-        <path d="M22 14 L12 6 L30 16 Z M22 36 L12 44 L30 34 Z" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="1.4" stroke-linejoin="round"/>
-        <path d="M18 17 L56 15 Q72 18 78 25 Q72 32 56 35 L18 33 Z" fill="#f4f7fb" stroke="#6d7c90" stroke-width="1.6" stroke-linejoin="round"/>
-        <path d="M60 15.5 Q72 18 78 25 Q72 32 60 34.5 Q64 25 60 15.5 Z" fill="currentColor"/>
-        <circle cx="46" cy="25" r="5.5" fill="#7fd3ff" stroke="#38597a" stroke-width="2"/>
-        <path d="M22 22 L52 22" stroke="currentColor" stroke-width="2" opacity=".6"/>
-      </svg>`
-    case 'ufo':
-      return `<svg viewBox="0 0 80 50" aria-hidden="true">
-        <path d="M30 34 L22 50 L58 50 L50 34 Z" fill="#b6ffde" opacity=".35" class="tc-beam"/>
-        <path d="M26 22 Q40 2 54 22 Z" fill="#bfe9ff" stroke="#4f7a9a" stroke-width="1.6"/>
-        <circle cx="40" cy="15" r="4" fill="#7bd96b"/>
-        <ellipse cx="40" cy="26" rx="30" ry="9" fill="currentColor" stroke="rgba(0,0,0,.45)" stroke-width="1.6"/>
-        <ellipse cx="40" cy="23" rx="20" ry="3.5" fill="rgba(255,255,255,.35)"/>
-        <g class="tc-lights" fill="#fff6a8">
-          <circle cx="20" cy="27" r="2.2"/><circle cx="30" cy="30" r="2.2"/><circle cx="40" cy="31" r="2.2"/>
-          <circle cx="50" cy="30" r="2.2"/><circle cx="60" cy="27" r="2.2"/>
-        </g>
-      </svg>`
-  }
 }
 
 const STYLE = `
@@ -251,71 +184,39 @@ const STYLE = `
   .tc-select button.tc-on { border-color: #3a7bd5; background: #e7f0ff; color: #1d4f9c; }
 
   /* --- რბოლა --- */
-  .tc-race { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 0 18px 18px; position: relative; }
-  .tc-track { border-radius: 18px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
-  .tc-lane {
-    position: relative; height: 76px; display: flex; align-items: stretch;
-    border-bottom: 3px dashed rgba(255,255,255,.55);
+  .tc-race { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 0 18px 18px; position: relative; }
+  .tc-stage3d {
+    position: relative; flex: 1; min-height: 260px; border-radius: 18px; overflow: hidden;
+    background: #f2a06e; box-shadow: 0 10px 30px rgba(0,0,0,.35);
   }
-  .tc-lane:last-child { border-bottom: 0; }
-  .tc-label {
-    width: 150px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 10px;
-    background: rgba(0,0,0,.35); color: #fff; font-weight: 900; font-size: 15px; overflow: hidden;
+  .tc-standings {
+    position: absolute; top: 10px; left: 10px; z-index: 2; display: grid; gap: 5px;
+    min-width: 190px; max-width: 46%;
   }
+  .tc-standing {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px;
+    background: rgba(20, 24, 48, .62); color: #fff; font-weight: 900; font-size: 14px;
+    backdrop-filter: blur(3px);
+  }
+  .tc-standing.tc-me { background: rgba(255, 210, 63, .92); color: #2b1b00; }
+  .tc-standing.tc-gone { opacity: .5; }
   .tc-rank {
-    width: 26px; height: 26px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    background: #fff; color: #222; font-size: 14px;
+    width: 24px; height: 24px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: #fff; color: #222; font-size: 13px;
   }
-  .tc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tc-me .tc-label { background: rgba(255,210,63,.55); color: #2b1b00; }
-  .tc-lane-track { position: relative; flex: 1; }
-  .tc-finish {
-    position: absolute; top: 0; bottom: 0; right: 0; width: 16px;
-    background: repeating-conic-gradient(#111 0 25%, #fff 0 50%) 0 0 / 8px 8px;
-  }
-  .tc-racer {
-    position: absolute; top: 6px; width: 84px; height: 64px; left: 0;
-    transition: left .25s linear; filter: drop-shadow(0 3px 2px rgba(0,0,0,.35));
-  }
-  .tc-racer svg { width: 84px; height: 52px; display: block; }
-  .tc-racer-name {
-    position: absolute; left: 0; right: 0; bottom: -2px; text-align: center;
-    font-size: 11px; font-weight: 900; color: #fff; text-shadow: 0 1px 2px #000; white-space: nowrap;
-  }
-  .tc-badge {
-    position: absolute; right: 110px; top: 50%; transform: translateY(-50%);
-    padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.92);
-    font-weight: 900; font-size: 14px; color: #222;
-  }
-  .tc-empty .tc-label { opacity: .5; }
-  .tc-gone { opacity: .45; }
-
-  .tc-scene-foot .tc-lane { background: linear-gradient(#59b84a, #3f9a37); }
-  .tc-scene-foot .tc-lane:nth-child(odd) { background: linear-gradient(#c8623b, #b24f2b); }
-  .tc-scene-car .tc-lane { background: linear-gradient(#53575f, #43464d); border-bottom-color: #ffd23f; }
-  .tc-scene-moto .tc-lane { background: linear-gradient(#d9a45f, #c98c46); border-bottom-color: #fff3d0; }
-  .tc-scene-rocket .tc-lane, .tc-scene-ufo .tc-lane {
-    background:
-      radial-gradient(1.5px 1.5px at 20% 30%, #fff 50%, transparent 51%),
-      radial-gradient(1.5px 1.5px at 60% 70%, #fff 50%, transparent 51%),
-      radial-gradient(1px 1px at 80% 20%, #fff 50%, transparent 51%),
-      radial-gradient(1px 1px at 40% 85%, #fff 50%, transparent 51%),
-      linear-gradient(#10163a, #1d1450);
-    background-size: 120px 76px, 160px 76px, 90px 76px, 140px 76px, auto;
-    border-bottom-color: rgba(140,170,255,.4);
-  }
-  .tc-scene-ufo .tc-lane { background-color: #2a0f4a; }
-
+  .tc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .tc-prog { font-size: 12px; opacity: .9; white-space: nowrap; }
+  .tc-stage3d .tc-ticker { position: absolute; top: 12px; left: 0; right: 0; z-index: 1; pointer-events: none; }
   .tc-ticker {
-    min-height: 34px; text-align: center; color: #fff; font-weight: 900; font-size: 18px;
+    min-height: 34px; padding: 0 12px; text-align: center; color: #fff; font-weight: 900; font-size: 18px;
     text-shadow: 0 2px 0 rgba(0,0,0,.35); transition: opacity .3s;
   }
   .tc-typing {
-    padding: 16px 18px; border-radius: 18px; background: #fff;
+    padding: 12px 18px; border-radius: 18px; background: #fff;
     box-shadow: 0 10px 30px rgba(0,0,0,.35);
   }
   .tc-text {
-    max-height: 132px; overflow: auto; font-size: 26px; line-height: 1.55;
+    max-height: 84px; overflow: auto; font-size: 24px; line-height: 1.6;
     font-weight: 700; color: #9aa7b6; word-break: break-word;
   }
   .tc-text .tc-done { color: #23a35a; }
@@ -343,29 +244,14 @@ const STYLE = `
   .tc-results .tc-score { margin-left: auto; color: #2b6cb0; }
   .tc-next { margin-top: 10px; font-size: 18px !important; color: #1f2d3d !important; }
 
-  .tc-wheel { animation: tc-spin .35s linear infinite; }
-  .tc-leg-a, .tc-arm-b { transform-origin: 40px 31px; animation: tc-swing .32s ease-in-out infinite alternate; }
-  .tc-leg-b, .tc-arm-a { transform-origin: 40px 31px; animation: tc-swing .32s ease-in-out infinite alternate-reverse; }
-  .tc-arm-a, .tc-arm-b { transform-origin: 42px 19px; }
-  .tc-flame { transform-origin: 18px 25px; animation: tc-flicker .12s linear infinite alternate; }
-  .tc-lights { animation: tc-blink .5s steps(2) infinite; }
-  .tc-racer { animation: tc-bob .5s ease-in-out infinite alternate; }
-  .tc-idle .tc-wheel, .tc-idle .tc-leg, .tc-idle .tc-arm, .tc-idle .tc-racer, .tc-idle .tc-speed { animation-play-state: paused; }
-  .tc-idle .tc-speed { opacity: 0; }
-  @keyframes tc-spin { to { transform: rotate(360deg); } }
-  @keyframes tc-swing { from { transform: rotate(-28deg); } to { transform: rotate(28deg); } }
-  @keyframes tc-flicker { from { transform: scaleX(.75); } to { transform: scaleX(1.15); } }
-  @keyframes tc-blink { 50% { opacity: .3; } }
-  @keyframes tc-bob { from { margin-top: 0; } to { margin-top: -3px; } }
   @keyframes tc-pop { from { transform: scale(1.3); opacity: .4; } 30% { transform: scale(1); opacity: 1; } }
   @keyframes tc-shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
   .tc-shake { animation: tc-shake .15s linear 2; }
   @media (max-width: 640px) {
-    .tc-label { width: 92px; font-size: 12px; }
+    .tc-standings { min-width: 140px; }
+    .tc-standing { font-size: 12px; padding: 4px 8px; }
+    .tc-stage3d .tc-ticker { top: auto; bottom: 10px; font-size: 15px; }
     .tc-text { font-size: 20px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .tc-wheel, .tc-leg, .tc-arm, .tc-racer, .tc-flame, .tc-lights { animation: none !important; }
   }
 `
 
@@ -395,6 +281,9 @@ export class TypingChampion {
   private hurryUntil = 0
   private prevOrder: number[] = []
   private tickerTimer = 0
+  private scene3d: TypingChampionScene | null = null
+  private wordStarts: number[] = []
+  private wordLens: number[] = []
   private timer = 0
 
   constructor(options: TypingChampionOptions = {}) {
@@ -436,6 +325,7 @@ export class TypingChampion {
   }
 
   private showMenu(error = '') {
+    this.disposeScene()
     this.builtStage = -1
     this.room = null
     this.setTop('ბეჭდვის რბოლა ლოკალურ ქსელში · 2–4 მოთამაშე')
@@ -501,6 +391,7 @@ export class TypingChampion {
 
   private showLobby() {
     const room = this.room!
+    this.disposeScene()
     this.builtStage = -1
     this.menuEnter = null
     const isHost = room.hostId === this.myId
@@ -571,24 +462,24 @@ export class TypingChampion {
     this.setTop(
       `ეტაპი ${stage + 1}/${stageCount} · ${vehicle.icon} ${vehicle.name} · ${words} სიტყვა · ოთახი ${this.room?.code ?? ''}`
     )
-    const lanes = [0, 1, 2, 3]
-      .map(
-        (lane) => `<div class="tc-lane tc-idle" data-lane="${lane}">
-          <div class="tc-label"><span class="tc-rank">–</span><span class="tc-name">ცარიელი ზოლი</span></div>
-          <div class="tc-lane-track">
-            <div class="tc-racer" hidden style="color:${LANE_COLORS[lane]}">${vehicleSvg(vehicle.kind)}<div class="tc-racer-name"></div></div>
-            <div class="tc-badge" hidden></div>
-            <div class="tc-finish"></div>
-          </div>
-        </div>`
-      )
-      .join('')
     const chars = [...this.text].map((ch) => `<span>${ch === ' ' ? ' ' : escapeHtml(ch)}</span>`).join('')
+    const wordList = this.text.split(' ')
+    this.wordStarts = []
+    this.wordLens = []
+    let offset = 0
+    for (const word of wordList) {
+      this.wordStarts.push(offset)
+      this.wordLens.push(word.length)
+      offset += word.length + 1
+    }
 
+    this.disposeScene()
     this.setBody(
       'tc-race',
-      `<div class="tc-track tc-scene-${vehicle.kind}">${lanes}</div>
-       <div class="tc-ticker"></div>
+      `<div class="tc-stage3d">
+         <div class="tc-standings"></div>
+         <div class="tc-ticker"></div>
+       </div>
        <div class="tc-typing">
          <div class="tc-text">${chars}</div>
          <div class="tc-stats">
@@ -600,6 +491,14 @@ export class TypingChampion {
        </div>
        <div class="tc-overlay" data-overlay><div class="tc-count">3</div></div>`
     )
+    try {
+      this.scene3d = new TypingChampionScene(this.body.querySelector<HTMLDivElement>('.tc-stage3d')!)
+      this.scene3d.setStage(wordList, vehicle.kind, this.scenePlayers(), this.myId)
+    } catch (err) {
+      // WebGL არ მუშაობს — რბოლა მაინც გრძელდება ცხრილით და ტექსტით
+      console.warn('Typing Champion: 3D სცენა ვერ ჩაირთო', err)
+      this.scene3d = null
+    }
     this.renderText()
     this.updateLanes()
   }
@@ -672,47 +571,66 @@ export class TypingChampion {
     return players.sort((a, b) => (a.place ?? 99) - (b.place ?? 99) || b.chars - a.chars || a.lane - b.lane)
   }
 
+  /** რამდენი სიტყვა (საფეხური) აქვს გავლილი ამდენი ასოთი, წილადით */
+  private stepsFor(chars: number): number {
+    let steps = 0
+    for (let i = 0; i < this.wordStarts.length; i++) {
+      const start = this.wordStarts[i]
+      const len = this.wordLens[i]
+      if (chars >= start + len) steps = i + 1
+      else {
+        if (chars > start) steps = i + (chars - start) / len
+        break
+      }
+    }
+    return steps
+  }
+
+  private charsOf(player: NetPlayer) {
+    return player.id === this.myId ? Math.max(this.typed, player.chars) : player.chars
+  }
+
+  private scenePlayers() {
+    return (this.room?.players ?? []).map((p) => ({
+      id: p.id,
+      lane: p.lane,
+      name: p.name,
+      steps: this.stepsFor(this.charsOf(p)),
+      place: p.place,
+      left: p.left,
+    }))
+  }
+
   private updateLanes() {
     const room = this.room
     if (!room || this.builtStage < 0) return
-    const total = [...this.text].length || 1
+    const total = this.text.length || 1
     const order = this.ranking()
     const racing = room.phase === 'race'
 
-    for (let lane = 0; lane < 4; lane++) {
-      const el = this.body.querySelector<HTMLDivElement>(`[data-lane="${lane}"]`)
-      if (!el) continue
-      const player = room.players.find((p) => p.lane === lane)
-      const racer = el.querySelector<HTMLDivElement>('.tc-racer')!
-      const badge = el.querySelector<HTMLDivElement>('.tc-badge')!
-      const rankEl = el.querySelector<HTMLSpanElement>('.tc-rank')!
-      const nameEl = el.querySelector<HTMLSpanElement>('.tc-name')!
+    this.scene3d?.setPlayers(this.scenePlayers())
+    this.scene3d?.setMyWord(Math.floor(this.stepsFor(this.typed)))
 
-      el.classList.toggle('tc-empty', !player)
-      el.classList.toggle('tc-me', player?.id === this.myId)
-      el.classList.toggle('tc-gone', !!player?.left)
-      if (!player) {
-        racer.hidden = true
-        badge.hidden = true
-        continue
-      }
-      const chars = player.id === this.myId ? Math.max(this.typed, player.chars) : player.chars
-      const progress = Math.min(1, chars / total)
-      const rank = order.indexOf(player) + 1
-
-      racer.hidden = false
-      racer.style.left = `calc((100% - 100px) * ${progress})`
-      racer.querySelector('.tc-racer-name')!.textContent = player.name
-      nameEl.textContent = player.left ? `${player.name} (გავიდა)` : player.name + (player.id === this.myId ? ' (შენ)' : '')
-      rankEl.textContent = player.left ? '–' : rank === 1 && chars > 0 ? '👑' : String(rank)
-      el.classList.toggle('tc-idle', !racing || player.place !== null || player.left)
-
-      if (player.place !== null) {
-        badge.hidden = false
-        badge.textContent = `${MEDALS[player.place - 1] ?? ''} ${((player.finishMs ?? 0) / 1000).toFixed(1)} წმ`
-      } else {
-        badge.hidden = true
-      }
+    // ცხრილი: ვინ რომელ ადგილზეა ახლა
+    const box = this.body.querySelector<HTMLDivElement>('.tc-standings')
+    if (box) {
+      const gone = room.players.filter((p) => p.left)
+      box.innerHTML = [...order, ...gone]
+        .map((p, i) => {
+          const chars = this.charsOf(p)
+          const rank = p.left ? '–' : i === 0 && chars > 0 ? '👑' : String(i + 1)
+          const status = p.left
+            ? 'გავიდა'
+            : p.place !== null
+              ? `${MEDALS[p.place - 1] ?? ''} ${((p.finishMs ?? 0) / 1000).toFixed(1)} წმ`
+              : `${Math.floor(this.stepsFor(chars))}/${this.wordStarts.length} · ${Math.round((chars / total) * 100)}%`
+          const classes = ['tc-standing', p.id === this.myId ? 'tc-me' : '', p.left ? 'tc-gone' : ''].join(' ')
+          return `<div class="${classes}"><span class="tc-rank">${rank}</span>
+            <span class="tc-dot" style="background:${LANE_COLORS[p.lane]}"></span>
+            <span class="tc-name">${escapeHtml(p.name)}${p.id === this.myId ? ' (შენ)' : ''}</span>
+            <span class="tc-prog">${status}</span></div>`
+        })
+        .join('')
     }
 
     if (racing) this.detectOvertakes(order)
@@ -981,9 +899,15 @@ export class TypingChampion {
     }
   }
 
+  private disposeScene() {
+    this.scene3d?.dispose()
+    this.scene3d = null
+  }
+
   close() {
     if (this.closed) return
     this.closed = true
+    this.disposeScene()
     window.removeEventListener('keydown', this.onKeyDown, true)
     window.clearInterval(this.timer)
     window.clearTimeout(this.tickerTimer)
