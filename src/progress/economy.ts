@@ -26,7 +26,7 @@ export interface GameInfo {
 /** სამჭედლოს მენიუს თამაშები, ამავე მიმდევრობით */
 export const GAMES: GameInfo[] = [
   { id: 'cpu-dash', name: 'CPU Dash', icon: '💻', free: false, available: true },
-  { id: 'ping-pong-dong', name: 'Ping-Pong-Dong', icon: '🏓', free: false, available: false },
+  { id: 'ping-pong-dong', name: 'Ping-Pong-Dong', icon: '🏓', free: false, available: true },
   { id: 'cliff-climber', name: 'Cliff Climber', icon: '🧗', free: false, available: false },
   { id: 'flappy-floppy', name: 'Flappy Floppy', icon: '💾', free: false, available: true },
   { id: 'jump-up-tower', name: 'Jump Up Tower', icon: '🗼', free: false, available: true },

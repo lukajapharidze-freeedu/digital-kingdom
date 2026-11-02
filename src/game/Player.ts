@@ -74,7 +74,9 @@ export class Player {
   }
 
   public update(delta: number, cameraYaw: number) {
-    const speed = 5.2
+    // Shift-ზე დაჭერით სირბილი
+    const sprinting = this.keys['ShiftLeft'] || this.keys['ShiftRight']
+    const speed = sprinting ? 8.6 : 5.2
     let inputX = 0
     let inputZ = 0
 
@@ -117,10 +119,10 @@ export class Player {
         difference * Math.min(1, delta * 12)
 
       if (this.isGrounded) {
-        this.walkTime += delta * 10
+        this.walkTime += delta * (sprinting ? 15 : 10)
 
-        const legSwing = Math.sin(this.walkTime) * 0.55
-        const armSwing = Math.sin(this.walkTime) * 0.45
+        const legSwing = Math.sin(this.walkTime) * (sprinting ? 0.8 : 0.55)
+        const armSwing = Math.sin(this.walkTime) * (sprinting ? 0.7 : 0.45)
 
         this.character.leftLeg.rotation.x = legSwing
         this.character.rightLeg.rotation.x = -legSwing
