@@ -18,7 +18,7 @@ import { Player } from './Player'
 import { GameCamera } from './Camera'
 import { CPUDash } from '../minigames/CPUDash'
 import { GameState } from '../progress/GameState'
-import { ECONOMY, GAMES } from '../progress/economy'
+import { ECONOMY, GAMES, gamePrice } from '../progress/economy'
 import { KingdomPanels, type PanelKind } from '../ui/KingdomPanels'
 import { GuidePath } from './GuidePath'
 import { showGuideModal } from '../ui/GuideModal'
@@ -29,6 +29,7 @@ import { FlappyFloppy } from '../minigames/FlappyFloppy'
 import { JumpUpTower } from '../minigames/JumpUpTower'
 import { SixSeven } from '../minigames/SixSeven'
 import { PingPongDong } from '../minigames/PingPongDong'
+import { TypingChampion } from '../minigames/TypingChampion'
 
 import {
   createKingdomWorld,
@@ -105,6 +106,7 @@ export class Game {
 
   private typingGrandmasterActive = false
   private sixSevenActive = false
+  private typingChampionActive = false
   private flappyActive = false
   private flappyFloppy: FlappyFloppy | null = null
   private pingPongActive = false
@@ -395,7 +397,8 @@ export class Game {
       this.flappyActive ||
       this.sixSevenActive ||
       this.pingPongActive ||
-      this.jumpTowerActive
+      this.jumpTowerActive ||
+      this.typingChampionActive
     )
   }
 
@@ -753,7 +756,7 @@ export class Game {
           ? '▶ უფასო თამაში'
           : '▶ თამაში'
         : buyable
-          ? `🔓 გახსნა — ${ECONOMY.BOOKS_PER_GAME} 📘`
+          ? `🔓 გახსნა — ${gamePrice(game.id)} 📘`
           : 'მალე დაემატება'
       const pillColors = playable
         ? 'background: #def7e6; color: #17703d; border: 1px solid #8fd3a8;'
@@ -790,6 +793,7 @@ export class Game {
             if (game.id === 'jump-up-tower') this.startJumpUpTower()
             if (game.id === 'six-seven') this.startSixSeven()
             if (game.id === 'ping-pong-dong') this.startPingPongDong()
+            if (game.id === 'typing-champion') this.startTypingChampion()
             return
           }
 
@@ -798,7 +802,7 @@ export class Game {
             this.showForgeGames()
           } else {
             this.showToast(
-              `არ გაკლია წიგნი: ${game.name}-ის გასახსნელად ${ECONOMY.BOOKS_PER_GAME} 📘 გჭირდება`
+              `არ გაკლია წიგნი: ${game.name}-ის გასახსნელად ${gamePrice(game.id)} 📘 გჭირდება`
             )
           }
         }
@@ -957,6 +961,28 @@ export class Game {
     new SixSeven({
       onClose: () => {
         this.sixSevenActive = false
+        this.clock.getDelta()
+        this.updateInteractions()
+      },
+    })
+  }
+
+  // Typing Champion — LAN რბოლა; ოთახის/ქსელის მთელი ლოგიკა თავად მინითამაშშია
+  private startTypingChampion() {
+    if (!this.forgeEnabled() || this.typingChampionActive) return
+    if (!this.state.isGameUnlocked('typing-champion')) return
+
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
+
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+    this.typingChampionActive = true
+    this.clock.getDelta()
+
+    new TypingChampion({
+      onClose: () => {
+        this.typingChampionActive = false
         this.clock.getDelta()
         this.updateInteractions()
       },

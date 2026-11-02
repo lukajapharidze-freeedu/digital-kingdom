@@ -1,4 +1,4 @@
-import { ECONOMY } from './economy'
+import { ECONOMY, gamePrice } from './economy'
 
 /**
  * მოთამაშის პროგრესი ინახება sessionStorage-ში:
@@ -241,9 +241,10 @@ export class GameState {
   /** ხსნის თამაშს წიგნებით; true, თუ წიგნები ეყო და თამაში გაიხსნა */
   unlockGame(id: string): boolean {
     if (this.isGameUnlocked(id)) return true
-    if (this.data.books < ECONOMY.BOOKS_PER_GAME) return false
-    this.data.books -= ECONOMY.BOOKS_PER_GAME
-    this.data.stats.booksSpentOnGames += ECONOMY.BOOKS_PER_GAME
+    const price = gamePrice(id)
+    if (this.data.books < price) return false
+    this.data.books -= price
+    this.data.stats.booksSpentOnGames += price
     this.data.unlockedGames.push(id)
     this.save()
     return true

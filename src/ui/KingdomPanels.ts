@@ -1,5 +1,5 @@
 import type { Grade } from './GradeSelect'
-import { ECONOMY, GAMES } from '../progress/economy'
+import { ECONOMY, GAMES, gamePrice } from '../progress/economy'
 import { gameVisual } from '../progress/gameIcons'
 import { decorateCurrency } from './currencyIcons'
 import { showGuideModal } from './GuideModal'
@@ -1083,7 +1083,7 @@ export class KingdomPanels {
         ? 'მალე დაემატება'
         : unlocked
           ? '✅ გახსნილია'
-          : `🔒 ${ECONOMY.BOOKS_PER_GAME} 📘`
+          : `🔒 ${gamePrice(game.id)} 📘`
       const visual = gameVisual(game.id)
 
       const rowEl = make(
