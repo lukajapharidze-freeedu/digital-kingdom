@@ -31,6 +31,8 @@ export const GAMES: GameInfo[] = [
   { id: 'flappy-floppy', name: 'Flappy Floppy', icon: '💾', free: false, available: true },
   { id: 'jump-up-tower', name: 'Jump Up Tower', icon: '🗼', free: false, available: true },
   { id: 'typing-grandmaster', name: 'Typing Grandmaster', icon: '⌨️', free: true, available: true },
+  // ქსელური რბოლა 2–4 მოთამაშისთვის (მასპინძელს სჭირდება npm run lan)
+  { id: 'typing-champion', name: 'Typing Champion', icon: '🏁', free: true, available: true },
   // ხუმრობა-თამაში: 2 📘 იხარჯება, სანაცვლოდ მხოლოდ მოქანავე "6 7"
   { id: 'six-seven', name: '6 7', icon: '🤷', free: false, available: true },
 ]

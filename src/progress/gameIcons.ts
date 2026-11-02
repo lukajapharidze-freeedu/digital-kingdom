@@ -51,6 +51,22 @@ const VISUALS: Record<string, GameVisual> = {
       </svg>`,
   },
 
+  // Typing Champion — სარბოლო მანქანა და ფინიშის დროშა
+  'typing-champion': {
+    colors: ['#9ff0b0', '#1f9e6a'],
+    svg: `
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M44 6 V34" stroke="#3a2a10" stroke-width="2.6" stroke-linecap="round"/>
+        <rect x="45" y="7" width="15" height="11" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.4"/>
+        <g fill="#1a1a1a"><rect x="45" y="7" width="5" height="3.7"/><rect x="55" y="7" width="5" height="3.7"/><rect x="50" y="10.7" width="5" height="3.7"/><rect x="45" y="14.3" width="5" height="3.7"/><rect x="55" y="14.3" width="5" height="3.7"/></g>
+        <path d="M6 46 Q6 38 14 37 L20 36 L27 27 Q29 25 32 25 L42 25 Q45 25 47 28 L51 36 Q58 37 58 44 L58 48 L6 48 Z" fill="#ff5a5f" stroke="#7a1d22" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M29 29 L33 29 L33 36 L24 36 Z M36 29 L43 29 L46 36 L36 36 Z" fill="#cfefff"/>
+        <circle cx="18" cy="49" r="6" fill="#222" stroke="#e8f8ff" stroke-width="2"/>
+        <circle cx="46" cy="49" r="6" fill="#222" stroke="#e8f8ff" stroke-width="2"/>
+        <path d="M1 40h4M0 46h4" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round"/>
+      </svg>`,
+  },
+
   // Flappy Floppy — დისკეტა ფრთებით
   'flappy-floppy': {
     colors: ['#ffd98a', '#ef8a1f'],

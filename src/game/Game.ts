@@ -28,6 +28,7 @@ import { TypingGrandmaster } from '../minigames/TypingGrandmaster'
 import { FlappyFloppy } from '../minigames/FlappyFloppy'
 import { JumpUpTower } from '../minigames/JumpUpTower'
 import { SixSeven } from '../minigames/SixSeven'
+import { TypingChampion } from '../minigames/TypingChampion'
 
 import {
   createKingdomWorld,
@@ -104,6 +105,7 @@ export class Game {
 
   private typingGrandmasterActive = false
   private sixSevenActive = false
+  private typingChampionActive = false
   private flappyActive = false
   private flappyFloppy: FlappyFloppy | null = null
   private jumpTowerActive = false
@@ -391,7 +393,8 @@ export class Game {
       this.typingGrandmasterActive ||
       this.flappyActive ||
       this.sixSevenActive ||
-      this.jumpTowerActive
+      this.jumpTowerActive ||
+      this.typingChampionActive
     )
   }
 
@@ -785,6 +788,7 @@ export class Game {
             if (game.id === 'flappy-floppy') this.startFlappyFloppy()
             if (game.id === 'jump-up-tower') this.startJumpUpTower()
             if (game.id === 'six-seven') this.startSixSeven()
+            if (game.id === 'typing-champion') this.startTypingChampion()
             return
           }
 
@@ -931,6 +935,27 @@ export class Game {
     new SixSeven({
       onClose: () => {
         this.sixSevenActive = false
+        this.clock.getDelta()
+        this.updateInteractions()
+      },
+    })
+  }
+
+  // Typing Champion — LAN რბოლა; ოთახის/ქსელის მთელი ლოგიკა თავად მინითამაშშია
+  private startTypingChampion() {
+    if (!this.forgeEnabled() || this.typingChampionActive) return
+
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
+
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+    this.typingChampionActive = true
+    this.clock.getDelta()
+
+    new TypingChampion({
+      onClose: () => {
+        this.typingChampionActive = false
         this.clock.getDelta()
         this.updateInteractions()
       },
