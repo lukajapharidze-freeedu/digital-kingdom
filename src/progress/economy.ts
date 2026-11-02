@@ -21,6 +21,8 @@ export interface GameInfo {
   free: boolean
   /** თამაში უკვე დაწერილია და ირთვება */
   available: boolean
+  /** გახსნის ფასი წიგნებში, თუ ჩვეულებრივისგან (BOOKS_PER_GAME) განსხვავდება */
+  price?: number
 }
 
 /** სამჭედლოს მენიუს თამაშები, ამავე მიმდევრობით */
@@ -32,7 +34,12 @@ export const GAMES: GameInfo[] = [
   { id: 'jump-up-tower', name: 'Jump Up Tower', icon: '🗼', free: false, available: true },
   { id: 'typing-grandmaster', name: 'Typing Grandmaster', icon: '⌨️', free: true, available: true },
   // ქსელური რბოლა 2–4 მოთამაშისთვის (მასპინძელს სჭირდება npm run lan)
-  { id: 'typing-champion', name: 'Typing Champion', icon: '🏁', free: true, available: true },
+  { id: 'typing-champion', name: 'Typing Champion', icon: '🏁', free: false, available: true, price: 6 },
   // ხუმრობა-თამაში: 2 📘 იხარჯება, სანაცვლოდ მხოლოდ მოქანავე "6 7"
   { id: 'six-seven', name: '6 7', icon: '🤷', free: false, available: true },
 ]
+
+/** რამდენი წიგნი ღირს ამ თამაშის გახსნა */
+export function gamePrice(id: string): number {
+  return GAMES.find((game) => game.id === id)?.price ?? ECONOMY.BOOKS_PER_GAME
+}

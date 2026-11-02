@@ -7,6 +7,9 @@
  *
  * ოთახი: 4-ნიშნა კოდი, მაქსიმუმ 4 მოთამაშე. სერვერი ინახავს ოთახის მდგომარეობას,
  * ითვლის ფინიშის რიგს და ქულებს, და ყველას უგზავნის ცვლილებებს.
+ *
+ * ქულა ეტაპზე = გავლილი საფეხურები (დაბეჭდილი სიტყვები) + ფინიშის ბონუსი (5 / 3 / 2 / 1).
+ * პირველი ფინიშის შემდეგ დანარჩენებს 10 წამი აქვთ.
  */
 import { createHash } from 'node:crypto'
 import { networkInterfaces } from 'node:os'
@@ -16,10 +19,11 @@ const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 const MAX_PLAYERS = 4
 const COUNTDOWN_MS = 3500
 /** პირველი ფინიშის შემდეგ დანარჩენებს ამდენი დრო აქვთ */
-const LATE_FINISH_MS = 40000
+const LATE_FINISH_MS = 10000
 /** ეტაპის შედეგების ჩვენების დრო შემდეგ ეტაპამდე */
 const RESULTS_MS = 6000
-const STAGE_POINTS = [4, 3, 2, 1]
+/** ფინიშის ბონუსი ადგილის მიხედვით */
+const FINISH_BONUS = [5, 3, 2, 1]
 
 /** @type {Map<string, Room>} */
 const rooms = new Map()
@@ -149,7 +153,8 @@ function encodeFrame(opcode, payload) {
 
 /**
  * @typedef {{ id: number, name: string, lane: number, conn: any, chars: number,
- *   finishMs: number | null, place: number | null, points: number, left: boolean }} Player
+ *   finishMs: number | null, place: number | null, points: number, stageSteps: number, stageBonus: number,
+ *   left: boolean }} Player
  * @typedef {{ code: string, hostId: number, players: Player[], phase: 'lobby' | 'countdown' | 'race' | 'results' | 'final',
  *   stages: string[], stage: number, startAt: number, finishCount: number, timers: any[] }} Room
  */
@@ -176,6 +181,8 @@ function publicPlayers(room) {
     finishMs: p.finishMs,
     place: p.place,
     points: p.points,
+    stageSteps: p.stageSteps,
+    stageBonus: p.stageBonus,
     left: p.left,
   }))
 }
@@ -215,6 +222,8 @@ function startStage(room, index) {
     p.chars = 0
     p.finishMs = null
     p.place = null
+    p.stageSteps = 0
+    p.stageBonus = 0
   }
   // ჯერ ტექსტი, მერე ოთახის მდგომარეობა — კლიენტი რბოლის ეკრანს ტექსტით აწყობს
   broadcast(room, {
@@ -234,9 +243,26 @@ function startStage(room, index) {
   )
 }
 
+/** რამდენი სიტყვა აქვს მთლიანად დაბეჭდილი */
+function completedWords(text, chars) {
+  let offset = 0
+  let count = 0
+  for (const word of text.split(' ')) {
+    if (chars >= offset + word.length) count++
+    offset += word.length + 1
+  }
+  return count
+}
+
 function endStage(room) {
   if (room.phase !== 'race' && room.phase !== 'countdown') return
   clearTimers(room)
+  const text = room.stages[room.stage]
+  for (const p of activePlayers(room)) {
+    p.stageSteps = completedWords(text, p.place !== null ? text.length : p.chars)
+    p.stageBonus = p.place !== null ? FINISH_BONUS[p.place - 1] ?? 1 : 0
+    p.points += p.stageSteps + p.stageBonus
+  }
   const last = room.stage >= room.stages.length - 1
   room.phase = last ? 'final' : 'results'
   sendRoom(room)
@@ -259,7 +285,6 @@ function onProgress(room, player, chars) {
     room.finishCount++
     player.place = room.finishCount
     player.finishMs = Date.now() - room.startAt
-    player.points += STAGE_POINTS[player.place - 1] ?? 1
     if (room.finishCount === 1) {
       // ნელ მოთამაშეს უსასრულოდ არ ველოდებით
       room.timers.push(setTimeout(() => endStage(room), LATE_FINISH_MS))
@@ -325,6 +350,8 @@ function handleConnection(conn, port) {
       finishMs: null,
       place: null,
       points: 0,
+      stageSteps: 0,
+      stageBonus: 0,
       left: false,
     }
     target.players.push(player)
@@ -396,6 +423,8 @@ function handleConnection(conn, port) {
         p.finishMs = null
         p.place = null
         p.points = 0
+        p.stageSteps = 0
+        p.stageBonus = 0
       }
       sendRoom(room)
     }

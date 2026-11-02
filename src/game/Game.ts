@@ -18,7 +18,7 @@ import { Player } from './Player'
 import { GameCamera } from './Camera'
 import { CPUDash } from '../minigames/CPUDash'
 import { GameState } from '../progress/GameState'
-import { ECONOMY, GAMES } from '../progress/economy'
+import { ECONOMY, GAMES, gamePrice } from '../progress/economy'
 import { KingdomPanels, type PanelKind } from '../ui/KingdomPanels'
 import { GuidePath } from './GuidePath'
 import { showGuideModal } from '../ui/GuideModal'
@@ -752,7 +752,7 @@ export class Game {
           ? '▶ უფასო თამაში'
           : '▶ თამაში'
         : buyable
-          ? `🔓 გახსნა — ${ECONOMY.BOOKS_PER_GAME} 📘`
+          ? `🔓 გახსნა — ${gamePrice(game.id)} 📘`
           : 'მალე დაემატება'
       const pillColors = playable
         ? 'background: #def7e6; color: #17703d; border: 1px solid #8fd3a8;'
@@ -797,7 +797,7 @@ export class Game {
             this.showForgeGames()
           } else {
             this.showToast(
-              `არ გაკლია წიგნი: ${game.name}-ის გასახსნელად ${ECONOMY.BOOKS_PER_GAME} 📘 გჭირდება`
+              `არ გაკლია წიგნი: ${game.name}-ის გასახსნელად ${gamePrice(game.id)} 📘 გჭირდება`
             )
           }
         }
@@ -944,6 +944,7 @@ export class Game {
   // Typing Champion — LAN რბოლა; ოთახის/ქსელის მთელი ლოგიკა თავად მინითამაშშია
   private startTypingChampion() {
     if (!this.forgeEnabled() || this.typingChampionActive) return
+    if (!this.state.isGameUnlocked('typing-champion')) return
 
     this.forgeGamesOverlay?.remove()
     this.forgeGamesOverlay = null
