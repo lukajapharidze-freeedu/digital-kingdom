@@ -28,6 +28,7 @@ import { TypingGrandmaster } from '../minigames/TypingGrandmaster'
 import { FlappyFloppy } from '../minigames/FlappyFloppy'
 import { JumpUpTower } from '../minigames/JumpUpTower'
 import { SixSeven } from '../minigames/SixSeven'
+import { PingPongDong } from '../minigames/PingPongDong'
 
 import {
   createKingdomWorld,
@@ -53,7 +54,7 @@ const ISLAND_START_HOUR = 17
 const KINGDOM_START_HOUR = 18
 
 /** რომელი კლასებისთვის ირთვება ნაბიჯ-ნაბიჯ სახელმძღვანელო (ფანჯრები + მწვანე გზა) */
-const GUIDE_GRADES: Grade[] = [2, 3]
+const GUIDE_GRADES: Grade[] = [2, 3, 4]
 
 /** საწყისი კუნძულის რადიუსი (გზის საძებნად) */
 const ISLAND_RADIUS = 12.5
@@ -106,6 +107,7 @@ export class Game {
   private sixSevenActive = false
   private flappyActive = false
   private flappyFloppy: FlappyFloppy | null = null
+  private pingPongActive = false
   private jumpTowerActive = false
   private jumpUpTower: JumpUpTower | null = null
   private typingGrandmaster: TypingGrandmaster | null = null
@@ -333,6 +335,7 @@ export class Game {
         <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> მოძრაობა</div>
         <div><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> მოძრაობა</div>
         <div>🖱️ კამერა</div>
+        <div><kbd>SHIFT</kbd> სირბილი</div>
         <div><kbd>SPACE</kbd> ახტომა</div>
         <div><kbd>E</kbd> ინტერაქცია</div>
         <div><kbd>T</kbd> დრო (დღე / საღამო / ღამე)</div>
@@ -391,6 +394,7 @@ export class Game {
       this.typingGrandmasterActive ||
       this.flappyActive ||
       this.sixSevenActive ||
+      this.pingPongActive ||
       this.jumpTowerActive
     )
   }
@@ -785,6 +789,7 @@ export class Game {
             if (game.id === 'flappy-floppy') this.startFlappyFloppy()
             if (game.id === 'jump-up-tower') this.startJumpUpTower()
             if (game.id === 'six-seven') this.startSixSeven()
+            if (game.id === 'ping-pong-dong') this.startPingPongDong()
             return
           }
 
@@ -910,6 +915,27 @@ export class Game {
       onClose: () => {
         this.flappyFloppy = null
         this.flappyActive = false
+        this.clock.getDelta()
+        this.updateInteractions()
+      },
+    })
+  }
+
+  private startPingPongDong() {
+    if (!this.forgeEnabled() || this.pingPongActive) return
+    if (!this.state.isGameUnlocked('ping-pong-dong')) return
+
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
+
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+    this.pingPongActive = true
+    this.clock.getDelta()
+
+    new PingPongDong({
+      onClose: () => {
+        this.pingPongActive = false
         this.clock.getDelta()
         this.updateInteractions()
       },
