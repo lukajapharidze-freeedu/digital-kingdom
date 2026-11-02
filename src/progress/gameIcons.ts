@@ -51,19 +51,43 @@ const VISUALS: Record<string, GameVisual> = {
       </svg>`,
   },
 
-  // Typing Champion — სარბოლო მანქანა და ფინიშის დროშა
+  // Typing Champion — კიბე ცაში: კუბიკის გმირი სიტყვების საფეხურებზე ადის ფინიშის დროშისკენ
   'typing-champion': {
-    colors: ['#9ff0b0', '#1f9e6a'],
+    colors: ['#c9ecff', '#7b86e8'],
     svg: `
       <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path d="M44 6 V34" stroke="#3a2a10" stroke-width="2.6" stroke-linecap="round"/>
-        <rect x="45" y="7" width="15" height="11" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.4"/>
-        <g fill="#1a1a1a"><rect x="45" y="7" width="5" height="3.7"/><rect x="55" y="7" width="5" height="3.7"/><rect x="50" y="10.7" width="5" height="3.7"/><rect x="45" y="14.3" width="5" height="3.7"/><rect x="55" y="14.3" width="5" height="3.7"/></g>
-        <path d="M6 46 Q6 38 14 37 L20 36 L27 27 Q29 25 32 25 L42 25 Q45 25 47 28 L51 36 Q58 37 58 44 L58 48 L6 48 Z" fill="#ff5a5f" stroke="#7a1d22" stroke-width="2" stroke-linejoin="round"/>
-        <path d="M29 29 L33 29 L33 36 L24 36 Z M36 29 L43 29 L46 36 L36 36 Z" fill="#cfefff"/>
-        <circle cx="18" cy="49" r="6" fill="#222" stroke="#e8f8ff" stroke-width="2"/>
-        <circle cx="46" cy="49" r="6" fill="#222" stroke="#e8f8ff" stroke-width="2"/>
-        <path d="M1 40h4M0 46h4" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M2 58 V51 H11 V44 H22 V37 H33 V30 H44 V23 H62 V58 Z" fill="#8a5a35" stroke="#4a2f19" stroke-width="2" stroke-linejoin="round"/>
+        <g fill="#c6955e">
+          <rect x="3" y="51" width="8" height="2.6"/><rect x="11" y="44" width="11" height="2.6"/>
+          <rect x="22" y="37" width="11" height="2.6"/><rect x="33" y="30" width="11" height="2.6"/>
+          <rect x="44" y="23" width="17" height="2.6"/>
+        </g>
+        <g fill="#9a9a9a" stroke="#555555" stroke-width="0.8">
+          <rect x="9" y="49" width="3" height="3"/><rect x="20" y="42" width="3" height="3"/>
+          <rect x="31" y="35" width="3" height="3"/><rect x="42" y="28" width="3" height="3"/>
+        </g>
+        <rect x="36" y="8" width="18" height="12" rx="3" fill="#1e5abe" stroke="#9fe8ff" stroke-width="1.8"/>
+        <text x="45" y="17.6" text-anchor="middle" font-family="Arial, sans-serif" font-size="10.5" font-weight="900" fill="#ffffff">ა</text>
+        <path d="M56 23 V3" stroke="#4a2f19" stroke-width="2" stroke-linecap="round"/>
+        <g>
+          <rect x="57" y="3" width="6.5" height="6" fill="#ffffff" stroke="#1a1a1a" stroke-width="0.8"/>
+          <rect x="57" y="3" width="2.2" height="2" fill="#1a1a1a"/><rect x="61.3" y="3" width="2.2" height="2" fill="#1a1a1a"/>
+          <rect x="59.2" y="5" width="2.1" height="2" fill="#1a1a1a"/>
+          <rect x="57" y="7" width="2.2" height="2" fill="#1a1a1a"/><rect x="61.3" y="7" width="2.2" height="2" fill="#1a1a1a"/>
+        </g>
+        <g stroke="#2a1a10" stroke-width="0.8" stroke-linejoin="round" transform="translate(25 37.5) scale(1.45) translate(-25 -37.5)">
+          <path d="M20.5 22 L12.5 33 L19.5 31.5 Z" fill="#ffb31f"/>
+          <rect x="21" y="29.5" width="3.2" height="8" fill="#24376e" transform="rotate(-24 22.6 29.5)"/>
+          <rect x="24.4" y="29.5" width="3.2" height="8" fill="#2f4a8c" transform="rotate(26 26 29.5)"/>
+          <rect x="20.5" y="21" width="7.5" height="9" fill="#d8302b"/>
+          <path d="M24.8 22.5 L23.2 25.4 H25 L23.8 28.3 L26.4 24.7 H24.8 Z" fill="#ffd23f" stroke="none"/>
+          <rect x="26" y="22" width="2.8" height="7" fill="#d8302b" transform="rotate(-50 27.4 22)"/>
+          <rect x="20.5" y="13" width="7.5" height="8" fill="#f1c49b"/>
+          <rect x="20.5" y="13" width="7.5" height="2.6" fill="#1f1a17"/>
+          <rect x="20.5" y="13" width="2" height="5" fill="#1f1a17" stroke="none"/>
+        </g>
+        <rect x="25.6" y="16.6" width="1.3" height="1.5" fill="#1b2a6b" transform="translate(25 37.5) scale(1.45) translate(-25 -37.5)"/>
+        <path d="M3 30h5M2 35h4" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity=".9"/>
       </svg>`,
   },
 
