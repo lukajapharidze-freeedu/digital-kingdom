@@ -31,7 +31,7 @@ let nextPlayerId = 1
 
 // ---------------------------------------------------------------- WebSocket
 
-function acceptSocket(req, socket, onOpen) {
+export function acceptSocket(req, socket, onOpen) {
   const key = req.headers['sec-websocket-key']
   if (!key) {
     socket.destroy()
@@ -322,7 +322,7 @@ function freeLane(room) {
   return -1
 }
 
-function lanUrls(port) {
+export function lanUrls(port) {
   const urls = []
   for (const list of Object.values(networkInterfaces())) {
     for (const addr of list ?? []) {

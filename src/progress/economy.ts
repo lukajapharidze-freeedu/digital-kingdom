@@ -32,6 +32,7 @@ export const GAMES: GameInfo[] = [
   { id: 'cliff-climber', name: 'Cliff Climber', icon: '🧗', free: false, available: false },
   { id: 'flappy-floppy', name: 'Flappy Floppy', icon: '💾', free: false, available: true },
   { id: 'jump-up-tower', name: 'Jump Up Tower', icon: '🗼', free: false, available: true },
+  { id: 'penalty-shooter', name: 'Penalty Shooter', icon: '⚽', free: false, available: true },
   { id: 'typing-grandmaster', name: 'Typing Grandmaster', icon: '⌨️', free: true, available: true },
   // ქსელური რბოლა 2–4 მოთამაშისთვის (მასპინძელს სჭირდება npm run lan)
   { id: 'typing-champion', name: 'Typing Champion', icon: '🏁', free: false, available: true, price: 6 },

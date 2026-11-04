@@ -30,6 +30,8 @@ import { JumpUpTower } from '../minigames/JumpUpTower'
 import { SixSeven } from '../minigames/SixSeven'
 import { PingPongDong } from '../minigames/PingPongDong'
 import { TypingChampion } from '../minigames/TypingChampion'
+import { PenaltyShooter } from '../minigames/PenaltyShooter'
+import { penaltyPoolForCode } from '../content/topics'
 
 import {
   createKingdomWorld,
@@ -112,6 +114,7 @@ export class Game {
   private pingPongActive = false
   private jumpTowerActive = false
   private jumpUpTower: JumpUpTower | null = null
+  private penaltyActive = false
   private typingGrandmaster: TypingGrandmaster | null = null
 
   private currentWorld: WorldName = 'island'
@@ -398,7 +401,8 @@ export class Game {
       this.sixSevenActive ||
       this.pingPongActive ||
       this.jumpTowerActive ||
-      this.typingChampionActive
+      this.typingChampionActive ||
+      this.penaltyActive
     )
   }
 
@@ -791,6 +795,7 @@ export class Game {
             if (game.id === 'typing-grandmaster') this.startTypingGrandmaster()
             if (game.id === 'flappy-floppy') this.startFlappyFloppy()
             if (game.id === 'jump-up-tower') this.startJumpUpTower()
+            if (game.id === 'penalty-shooter') this.startPenaltyShooter()
             if (game.id === 'six-seven') this.startSixSeven()
             if (game.id === 'ping-pong-dong') this.startPingPongDong()
             if (game.id === 'typing-champion') this.startTypingChampion()
@@ -1005,6 +1010,30 @@ export class Game {
       onClose: () => {
         this.jumpUpTower = null
         this.jumpTowerActive = false
+        this.clock.getDelta()
+        this.updateInteractions()
+      },
+    })
+  }
+
+  private startPenaltyShooter() {
+    if (!this.forgeEnabled() || this.penaltyActive) return
+    if (!this.state.isGameUnlocked('penalty-shooter')) return
+
+    this.forgeGamesOverlay?.remove()
+    this.forgeGamesOverlay = null
+
+    this.interactionPrompt.style.display = 'none'
+    this.currentInteraction = null
+    this.penaltyActive = true
+    this.clock.getDelta()
+
+    // ეგზემპლარი თვითონ მართავს თავს და onClose-ით გვატყობინებს დახურვას
+    new PenaltyShooter({
+      // ბიბლიოთეკის კოდი → ამ თემისა და წინა თემების კითხვები
+      findPool: code => penaltyPoolForCode(code),
+      onClose: () => {
+        this.penaltyActive = false
         this.clock.getDelta()
         this.updateInteractions()
       },

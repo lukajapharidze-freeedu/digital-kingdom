@@ -525,3 +525,36 @@ export function questionsForGame(
     }))
   })
 }
+// ---------- Penalty Shooter ----------
+
+export interface PenaltyPool {
+  topicTitle: string
+  grade: Grade
+  questions: GameQuestion[]
+}
+
+/**
+ * Penalty Shooter: ბიბლიოთეკის კოდი → ამ თემისა და ამავე კლასის ყველა წინა თემის კითხვები
+ * (როგორც თემები TOPICS-ში არის დალაგებული, ანუ კვირების მიმდევრობით).
+ * კოდი არასწორია → null. კოდი თემას არ ხსნის, მხოლოდ კითხვების ნაკრებს არჩევს.
+ */
+export function penaltyPoolForCode(code: string): PenaltyPool | null {
+  const topic = findTopicByCode(code)
+  if (!topic) return null
+
+  const index = TOPICS.indexOf(topic)
+  const topics = TOPICS.filter(
+    (candidate, i) => i <= index && candidate.grades.some(grade => topic.grades.includes(grade)),
+  )
+
+  const questions: GameQuestion[] = topics.flatMap(item =>
+    item.questions.map(question => ({
+      prompt: question.prompt,
+      answers: question.answers,
+      hint: `პასუხი ბიბლიოთეკაში, ${question.round === 1 ? 'ძირითადი' : 'დამატებითი'} ტექსტის ${question.page}-ე გვერდზეა.`,
+      check: (input: string) => isAnswerCorrect(question, input),
+    })),
+  )
+
+  return { topicTitle: topic.title, grade: topic.grades[0], questions }
+}

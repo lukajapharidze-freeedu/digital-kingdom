@@ -134,6 +134,22 @@ const VISUALS: Record<string, GameVisual> = {
       </svg>`,
   },
 
+  // Penalty Shooter — ბურთი კართან
+  'penalty-shooter': {
+    colors: ['#9bec8f', '#1f9a4a'],
+    svg: `
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="6" y="12" width="52" height="36" rx="2" fill="rgba(255,255,255,0.18)" stroke="#ffffff" stroke-width="3.2" stroke-linejoin="round"/>
+        <g stroke="#ffffff" stroke-width="1.2" opacity="0.8">
+          <path d="M16 13V47M26 13V47M36 13V47M46 13V47M7 22H57M7 32H57M7 42H57"/>
+        </g>
+        <path d="M4 50H60" stroke="#e8ffe9" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="42" cy="44" r="13" fill="#ffffff" stroke="#2a3140" stroke-width="2.4"/>
+        <polygon points="42,38 47.5,42 45.4,48.4 38.6,48.4 36.5,42" fill="#2a3140"/>
+        <path d="M42 38V33M47.5 42L52.4 40M45.4 48.4L48.6 53.4M38.6 48.4L35.4 53.4M36.5 42L31.6 40" stroke="#2a3140" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>`,
+  },
+
   // Jump Up Tower — კოშკი ზემოთ მიმართული ისრით
   'jump-up-tower': {
     colors: ['#ffc08a', '#e0561f'],
