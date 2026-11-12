@@ -75,6 +75,17 @@ function emptyData(): SessionData {
   }
 }
 
+/** შემთხვევითი მთელი რიცხვი [0, max) — crypto-თი, თუ ხელმისაწვდომია */
+function randomInt(max: number): number {
+  try {
+    const buf = new Uint32Array(1)
+    crypto.getRandomValues(buf)
+    return buf[0] % max
+  } catch {
+    return Math.floor(Math.random() * max)
+  }
+}
+
 export class GameState {
   private data: SessionData
   private readonly listeners = new Set<() => void>()
@@ -83,6 +94,8 @@ export class GameState {
    * მოსწავლის შენახულ პროგრესს არ ცვლის — მხოლოდ შედეგს "ზემოდან" ფარავს.
    */
   private teacher = false
+  /** "თემა:წრე" -> კითხვების შემთხვევითი რიგი ამ ჩანართისთვის */
+  private readonly quizOrders = new Map<string, string[]>()
 
   constructor() {
     this.data = this.load()
@@ -272,18 +285,19 @@ export class GameState {
    */
   quizOrderFor(topicId: string, round: number, ids: string[]): string[] {
     const key = `${topicId}:${round}`
-    const saved = this.data.quizOrder[key]
+    const saved = this.quizOrders.get(key)
     const valid =
       saved && saved.length === ids.length && ids.every(id => saved.includes(id))
     if (valid) return [...saved]
 
+    // რიგი მხოლოდ მეხსიერებაში ინახება (არა sessionStorage-ში): დაკოპირებული ან აღდგენილი ჩანართი
+    // სხვისი რიგით არ დაიწყებს. შემთხვევითობა — crypto-თი, რომ ყველა კომპიუტერზე განსხვავებული იყოს.
     const order = [...ids]
     for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1))
+      const j = randomInt(i + 1)
       ;[order[i], order[j]] = [order[j], order[i]]
     }
-    this.data.quizOrder[key] = order
-    this.save()
+    this.quizOrders.set(key, order)
     return [...order]
   }
 
