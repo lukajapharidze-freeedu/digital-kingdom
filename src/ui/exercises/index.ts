@@ -14,6 +14,9 @@ import { networkSim, packetsSim, routesSim } from './network'
 import { mailSim } from './mail'
 import { abacusSim } from './misc'
 import { robotSim } from './robot'
+import { binarySim, circuitSim, gatesSim, passwordSim, pixelsSim, searchSim } from './small'
+import { filesSim } from './files'
+import { wordSim } from './word'
 
 type Sim = (host: HTMLElement, tasks: SimTask[], config: never, ctx: ExerciseCtx) => void
 
@@ -27,6 +30,14 @@ const SIMS: Record<string, Sim> = {
   mail: mailSim,
   abacus: abacusSim,
   robot: robotSim,
+  password: passwordSim,
+  binary: binarySim,
+  pixels: pixelsSim,
+  gates: gatesSim,
+  circuit: circuitSim,
+  search: searchSim,
+  files: filesSim,
+  word: wordSim,
 }
 
 /**

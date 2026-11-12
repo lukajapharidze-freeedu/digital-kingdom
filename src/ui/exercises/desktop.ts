@@ -504,6 +504,7 @@ export function desktopSim(host: HTMLElement, tasks: SimTask[], config: DesktopC
         btn('dk-running', `${app.icon} ${app.name}`, () => {
           entry.win.style.display = 'flex'
           entry.win.style.zIndex = String(++z)
+          emit(`open:${id}`)
         }),
       )
     })
