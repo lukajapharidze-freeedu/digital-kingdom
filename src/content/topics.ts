@@ -49,7 +49,48 @@ export interface TopicPage {
   example?: string
   /** "დაიმახსოვრე" — ამ გვერდის მთავარი აზრი ერთ წინადადებაში */
   remember?: string
+  /**
+   * ინტერაქტიული სავარჯიშო. თუ არის, გვერდი სავარჯიშოდ ჩანს:
+   * body — მოკლე შესავალი, remember — სავარჯიშოს დასრულებისას იხსნება.
+   */
+  exercise?: Exercise
 }
+
+/** სავარჯიშოს ვარიანტი (ბარათი/ღილაკი). note — ახსნა, რომელიც დაწკაპუნებისას ჩნდება */
+export interface ExOption {
+  icon?: string
+  text: string
+  correct?: boolean
+  note?: string
+}
+
+/** სიმულატორის ერთი დავალება: event — რა უნდა მოხდეს სიმულატორში */
+export interface SimTask {
+  text: string
+  event: string
+  note?: string
+}
+
+/**
+ * სავარჯიშოს ტიპები (ui/exercises):
+ *  match  — წყვილების პოვნა;            order — ნაბიჯების რიგით დალაგება;
+ *  sort   — ჯგუფებად დახარისხება;       pick  — ყველა სწორი ვარიანტის პოვნა;
+ *  blank  — გამოტოვებული სიტყვის ჩასმა; reveal — ბარათების გახსნა და შემოწმება;
+ *  yesno  — კი/არა;                      sim   — სიმულატორი (სამუშაო მაგიდა, ქსელი, ფოსტა...).
+ */
+export type Exercise =
+  | { kind: 'match'; pairs: { left: string; right: string; note?: string }[] }
+  | { kind: 'order'; steps: { text: string; note?: string }[] }
+  | { kind: 'sort'; groups: string[]; items: { text: string; group: number; note?: string }[] }
+  | { kind: 'pick'; question: string; options: ExOption[] }
+  | { kind: 'blank'; lines: { text: string; answer: string; note?: string }[]; extra?: string[] }
+  | {
+      kind: 'reveal'
+      cards: { icon: string; title: string; text: string }[]
+      check?: { question: string; options: ExOption[] }
+    }
+  | { kind: 'yesno'; yes?: string; no?: string; items: { text: string; yes: boolean; note?: string }[] }
+  | { kind: 'sim'; sim: string; tasks?: SimTask[]; config?: Record<string, unknown> }
 
 export interface TopicQuestion {
   id: string

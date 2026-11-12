@@ -5,7 +5,9 @@
  * მატჩს მასპინძლის ბრაუზერი მართავს (კითხვები, დრო, შედეგები); რელე უბრალოდ
  * შეტყობინებებს გადასცემს ერთიდან მეორეს. WebSocket-ის კოდი Typing Champion-ის რელესგან მოდის.
  */
+import { hostname } from 'node:os'
 import { acceptSocket, lanUrls } from './typingChampionRelay.mjs'
+import { LAN_NAME, lanNameActive } from './lanName.mjs'
 
 const WS_PATH = '/penalty-shooter-ws'
 
@@ -29,7 +31,10 @@ function handleConnection(conn, port) {
   let room = null
   let role = null // 'host' | 'guest'
 
-  conn.send({ t: 'hello', lanUrls: lanUrls(port) })
+  // pcName — სახელი, რომელსაც სტუმარი პორტ 80-ზე ბრაუზერში წერს:
+  // digitalkingdom.local, თუ ცხადდება, თორემ კომპიუტერის სახელი (მაგ. itroom)
+  const pcName = lanNameActive() ? LAN_NAME : hostname().toLowerCase()
+  conn.send({ t: 'hello', lanUrls: lanUrls(port), pcName })
 
   conn.onMessage = (text) => {
     let msg

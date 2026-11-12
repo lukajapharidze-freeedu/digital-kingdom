@@ -2,7 +2,7 @@
  * Penalty Shooter — ლოკალური თამაში ორ მოთამაშეზე (ერთ კომპიუტერზე).
  *
  * რიგ-რიგობით პენალტები: მოთამაშე 1 (მასპინძელი) ურტყამს პირველი. ყოველ დარტყმაზე ორივეს
- * (დამრტყმელსაც და მეკარესაც) თავისი კითხვა ეძლევა ბიბლიოთეკის იმ თემებიდან, რომლებიც
+ * (დამრტყმელსაც და მეკარესაც) კითხვა ეძლევა (SAME_QUESTION-ით ერთი და იგივე) ბიბლიოთეკის იმ თემებიდან, რომლებიც
  * შეყვანილ კოდამდეა.
  *
  *   დამრტყმელი სწორია, მეკარე არასწორი/დაგვიანებული  → გოლი
@@ -64,7 +64,7 @@ type NetState = {
 type NetAnswer = { k: 'answer'; kick: number; role: Role; value: string }
 
 type ServerMessage =
-  | { t: 'hello'; lanUrls: string[] }
+  | { t: 'hello'; lanUrls: string[]; pcName?: string }
   | { t: 'joined'; role: 'host' | 'guest'; code: string }
   | { t: 'guest'; name: string }
   | { t: 'left' }
@@ -106,6 +106,11 @@ const GRACE_SECONDS = 5
 const INTRO_SECONDS = 1.3
 const SHOT_SECONDS = 3.1
 const DOCK_HEIGHT = 236
+/**
+ * true — დამრტყმელსაც და მეკარესაც ერთი და იგივე კითხვა აქვთ (თანასწორი შეჯიბრი).
+ * false — თითოეულს თავისი შემთხვევითი კითხვა (თუ ერთმანეთის პასუხებს იწერენ).
+ */
+const SAME_QUESTION = true
 
 const GOAL = { left: 180, right: 1100, top: 130, ground: 395, post: 14 }
 const BALL_START = { x: 640, y: 560, r: 62 }
@@ -192,6 +197,8 @@ export class PenaltyShooter {
   private socket: WebSocket | null = null
   private roomCode = ''
   private lanUrls: string[] = []
+  /** მასპინძელი კომპიუტერის სახელი (პორტ 80-ზე სტუმარი მას წერს ბრაუზერში) */
+  private pcName = ''
   private guestName: string | null = null
   /** რომელი მოთამაშე ვარ ამ კომპიუტერზე (LAN-ში): 0 — მასპინძელი, 1 — სტუმარი */
   private myIndex: 0 | 1 = 0
@@ -635,6 +642,7 @@ export class PenaltyShooter {
     switch (msg.t) {
       case 'hello':
         this.lanUrls = Array.isArray(msg.lanUrls) ? msg.lanUrls.map(String) : []
+        this.pcName = /^[a-z0-9-]{1,63}(\.local)?$/.test(String(msg.pcName ?? '')) ? String(msg.pcName) : ''
         break
       case 'joined':
         this.roomCode = String(msg.code)
@@ -681,8 +689,16 @@ export class PenaltyShooter {
       this.lobbyHint.append('უთხარი მეორე მოთამაშეს ეს კოდი. თავის კომპიუტერზე გახსნას ')
       const urls = document.createElement('span')
       urls.className = 'pen-urls'
-      urls.textContent = this.lanUrls.length > 0 ? this.lanUrls.join(' ან ') : 'ამ კომპიუტერის მისამართი'
+      // პორტ 80-ზე (npm run lan) მოკლე სახელი მუშაობს; IP მისამართები სათადარიგოა
+      const ipUrls = this.lanUrls.map(url => url.replace(/:80\/$/, '/'))
+      const onPort80 = location.port === '' || location.port === '80'
+      urls.textContent = onPort80 && this.pcName
+        ? `${this.pcName}/`
+        : ipUrls.length > 0
+          ? ipUrls.join(' ან ')
+          : 'ამ კომპიუტერის მისამართი'
       this.lobbyHint.append(urls, ' → სამჭედლო → Penalty Shooter → „შესვლა კოდით“.')
+      if (onPort80 && this.pcName && ipUrls.length > 0) this.lobbyHint.append(` (ან ${ipUrls.join(' ან ')})`)
       this.lobbyInfo.textContent = this.guestName
         ? `🧤 ${this.guestName} შემოვიდა! დააჭირე „დაწყებას“.`
         : '⏳ ველოდებით მეორე მოთამაშეს…'
@@ -876,7 +892,7 @@ export class PenaltyShooter {
 
   private beginQuestions() {
     const shooterQuestion = this.drawQuestion()
-    const keeperQuestion = this.drawQuestion(shooterQuestion)
+    const keeperQuestion = SAME_QUESTION ? shooterQuestion : this.drawQuestion(shooterQuestion)
     this.questions = { shooter: shooterQuestion, keeper: keeperQuestion }
     this.phase = 'question'
     this.phaseTime = 0
@@ -1019,10 +1035,17 @@ export class PenaltyShooter {
     describe('keeper', keeperName, '🧤')
 
     // ვინც არასწორად უპასუხა ან დააგვიანა, მისი სწორი პასუხი ვაჩვენოთ
-    for (const role of ['shooter', 'keeper'] as Role[]) {
-      const question = this.questions[role]
-      if (question && this.answers[role] !== 'correct') {
-        lines.push(`სწორი პასუხი (${role === 'shooter' ? shooterName : keeperName}): ${question.answers[0]}`)
+    if (this.questions.shooter && this.questions.shooter === this.questions.keeper) {
+      // ერთი და იგივე კითხვა — სწორ პასუხს ერთხელ ვაჩვენებთ
+      if (this.answers.shooter !== 'correct' || this.answers.keeper !== 'correct') {
+        lines.push(`სწორი პასუხი: ${this.questions.shooter.answers[0]}`)
+      }
+    } else {
+      for (const role of ['shooter', 'keeper'] as Role[]) {
+        const question = this.questions[role]
+        if (question && this.answers[role] !== 'correct') {
+          lines.push(`სწორი პასუხი (${role === 'shooter' ? shooterName : keeperName}): ${question.answers[0]}`)
+        }
       }
     }
     this.resultLines = lines
@@ -1195,7 +1218,7 @@ export class PenaltyShooter {
 
     if (this.phase === 'intro') {
       title.textContent = `⚽ ${shooterName} ურტყამს`
-      sub.textContent = `🧤 ${keeperName} იცავს კარს • მოემზადეთ, ორივეს თავისი კითხვა ექნება`
+      sub.textContent = `🧤 ${keeperName} იცავს კარს • ${SAME_QUESTION ? 'მოემზადეთ, ორივეს ერთი და იგივე კითხვა ექნება' : 'მოემზადეთ, ორივეს თავისი კითხვა ექნება'}`
     } else if (this.phase === 'shot') {
       title.textContent = this.resultTitle
       sub.innerHTML = ''

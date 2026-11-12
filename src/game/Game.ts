@@ -135,6 +135,13 @@ export class Game {
     this.teacherCodes = teacherCodes
     this.scene = new THREE.Scene()
 
+    // ჩანართის შემთხვევით დახურვისას ბრაუზერი გაგვაფრთხილებს (პროგრესი და LAN-თამაში დაიკარგება).
+    // ტექსტს ბრაუზერი თვითონ წერს — საკუთარს ვერ ვაჩვენებთ.
+    window.addEventListener('beforeunload', event => {
+      event.preventDefault()
+      event.returnValue = ''
+    })
+
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
     })

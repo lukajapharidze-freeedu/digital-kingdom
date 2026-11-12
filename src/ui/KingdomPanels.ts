@@ -4,6 +4,7 @@ import { gameVisual } from '../progress/gameIcons'
 import { decorateCurrency } from './currencyIcons'
 import { showGuideModal } from './GuideModal'
 import { hasPictureIcon, pictureIconSvg } from './pictureIcons'
+import { mountExercise } from './exercises'
 import { TEACHER_GRADES, topicsInLessonOrder, type TeacherCodes } from '../content/teacher'
 import type { GameState } from '../progress/GameState'
 import {
@@ -253,6 +254,8 @@ export class KingdomPanels {
   private card: HTMLDivElement | null = null
   /** ბიბლიოთეკის ტექსტის ფანჯარაში ჩასატევი ფუნქცია (ეკრანის ზომის შეცვლისას თავიდან ეშვება) */
   private readerFit: (() => void) | null = null
+  /** ამ სესიაში უკვე შესრულებული სავარჯიშოები (თემა:ტექსტი:გვერდი) — უკან დაბრუნებისას თავიდან არ ვითხოვთ */
+  private readonly exercisesDone = new Set<string>()
 
   constructor(options: PanelsOptions) {
     this.state = options.state
@@ -577,7 +580,13 @@ export class KingdomPanels {
       ),
     )
 
-    if (page.picture) body.appendChild(pictureBox(page.picture, index + (extra ? 2 : 0)))
+    const exercise = page.exercise
+    const doneKey = `${topic.id}:${extra ? 'x' : 'm'}:${index}`
+    // სავარჯიშოს დასრულებამდე „შემდეგი“ დაკეტილია (მასწავლებელი თავისუფლად ფურცლავს)
+    let locked = !!exercise && !this.exercisesDone.has(doneKey) && !this.state.teacherMode
+    let unlock = () => {}
+
+    if (page.picture && !exercise) body.appendChild(pictureBox(page.picture, index + (extra ? 2 : 0)))
 
     for (const paragraph of page.body) {
       const p = make('p', 'margin: 0 0 0.55em;')
@@ -629,6 +638,16 @@ export class KingdomPanels {
       body.appendChild(box)
     }
 
+    let revealRemember = () => {}
+    if (exercise) {
+      mountExercise(body, exercise, () => {
+        this.exercisesDone.add(doneKey)
+        locked = false
+        revealRemember()
+        unlock()
+      })
+    }
+
     if (page.remember) {
       const box = make(
         'div',
@@ -643,7 +662,18 @@ export class KingdomPanels {
       )
       box.appendChild(make('strong', 'display: block; margin-bottom: 0.1em; color: #1f7a45;', '⭐ დაიმახსოვრე'))
       const text = make('div')
-      richText(text, page.remember)
+      const remember = page.remember
+      if (locked) {
+        text.textContent = '🔒 დაასრულე სავარჯიშო და აქ მთავარი აზრი გამოჩნდება.'
+        box.style.opacity = '0.6'
+        revealRemember = () => {
+          text.replaceChildren()
+          richText(text, remember)
+          box.style.opacity = '1'
+        }
+      } else {
+        richText(text, remember)
+      }
       box.appendChild(text)
       body.appendChild(box)
     }
@@ -651,16 +681,29 @@ export class KingdomPanels {
 
     // ყველა ღილაკი ერთ რიგში (ადგილის დასაზოგად)
     const isLast = index === pages.length - 1
-    const controls = row(
-      button('← წინა', '#6b7c8f', () => this.renderReader(topic, extra, index - 1), index === 0),
-      isLast
-        ? button('✅ დასრულება', '#27834a', () => {
+    const forward = isLast
+      ? button(
+          '✅ დასრულება',
+          '#27834a',
+          () => {
             // ტექსტის დასრულებისას პირდაპირ გამოვდივართ ბიბლიოთეკიდან; ამიერიდან დახურვა/სიაში ღილაკები აქტიურია
             this.state.markLibraryReadDone()
             this.close()
-            this.toast('✨ ტექსტი წაკითხულია! ახლა აკადემიაში გამოსცადე თავი და მიიღე 📘 წიგნები.')
-          })
-        : button('შემდეგი →', '#27834a', () => this.renderReader(topic, extra, index + 1)),
+            this.toast('✨ თემა გავლილია! ახლა აკადემიაში გამოსცადე თავი და მიიღე 📘 წიგნები.')
+          },
+          locked,
+        )
+      : button('შემდეგი →', '#27834a', () => this.renderReader(topic, extra, index + 1), locked)
+    unlock = () => {
+      forward.disabled = false
+      forward.style.background = '#27834a'
+      forward.style.cursor = 'pointer'
+      forward.animate?.([{ transform: 'scale(1)' }, { transform: 'scale(1.12)' }, { transform: 'scale(1)' }], { duration: 500, iterations: 2 })
+    }
+    if (!locked) unlock()
+    const controls = row(
+      button('← წინა', '#6b7c8f', () => this.renderReader(topic, extra, index - 1), index === 0),
+      forward,
       ...(this.canClose()
         ? [
             button('სიაში', '#315b88', () => this.renderLibraryHome()),
@@ -676,7 +719,9 @@ export class KingdomPanels {
       if (!(card.clientHeight > 0)) return
       let size = 19
       body.style.fontSize = `${size}px`
-      while (card.scrollHeight > card.clientHeight + 1 && size > 13.5) {
+      // სავარჯიშოს გვერდზე ტექსტს ძალიან არ ვაპატარავებთ — საჭიროებისას ფანჯარა ჩაისქროლება
+      const smallest = exercise ? 15.5 : 13.5
+      while (card.scrollHeight > card.clientHeight + 1 && size > smallest) {
         size -= 0.5
         body.style.fontSize = `${size}px`
       }
