@@ -475,16 +475,16 @@ export class PenaltyShooter {
       this.modeHint.textContent =
         'ორი მოთამაშე ერთ კომპიუტერზე. შეიყვანე ბიბლიოთეკის კოდი — კითხვები ამ თემიდან და წინა თემებიდან იქნება.'
       this.startButton.textContent = '▶ დაწყება'
-      this.startHint.textContent = 'მასპინძელი (მოთამაშე 1) ურტყამს პირველი.'
+      this.startHint.textContent = 'პირველი ურტყამს მასპინძელი (მოთამაშე 1).'
     } else if (mode === 'host') {
       this.modeHint.textContent =
         'ორი კომპიუტერი ერთ ქსელში. შენ ქმნი ოთახს და მიიღებ კოდს, მეორე მოთამაშე მას თავის კომპიუტერზე ჩაწერს. ბიბლიოთეკის კოდი კითხვებს ირჩევს.'
       this.startButton.textContent = '👑 ოთახის შექმნა'
-      this.startHint.textContent = 'მასპინძელი (შენ) ურტყამს პირველი.'
+      this.startHint.textContent = 'პირველი ურტყამს მასპინძელი (შენ).'
     } else {
       this.modeHint.textContent = 'ჩაწერე ოთახის კოდი, რომელსაც მასპინძლის ეკრანზე ხედავ.'
       this.startButton.textContent = '🔑 შესვლა'
-      this.startHint.textContent = 'კითხვებს მასპინძელი ირჩევს. ის ურტყამს პირველი.'
+      this.startHint.textContent = 'კითხვებს მასპინძელი ირჩევს. პირველიც ის ურტყამს.'
     }
     this.setupError.textContent = ''
     ;(mode === 'guest' ? this.roomInput : this.codeInput).focus?.()
@@ -1232,7 +1232,7 @@ export class PenaltyShooter {
       sub.textContent = ''
     } else {
       title.textContent = '⚽ Penalty Shooter'
-      sub.textContent = 'შეიყვანე კოდი და დაიწყეთ'
+      sub.textContent = 'შეიყვანეთ კოდი და დაიწყეთ'
     }
     message.append(title, sub)
     this.dock.appendChild(message)
@@ -1874,7 +1874,7 @@ export class PenaltyShooter {
       ctx.textAlign = 'center'
       ctx.font = '800 16px Inter, system-ui, sans-serif'
       ctx.fillStyle = '#ffd86b'
-      ctx.fillText('⚡ დამატებითი დარტყმები — პირველ გაფუჭებამდე', cx, top + plateH - 16)
+      ctx.fillText('⚡ დამატებითი დარტყმები — პირველ აცდენამდე', cx, top + plateH - 16)
     }
     ctx.restore()
   }

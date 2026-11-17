@@ -159,7 +159,7 @@ export function wordSim(host: HTMLElement, tasks: SimTask[], config: WordConfig,
     }
     if (tools.has('style')) {
       group(
-        b('B', 'მსხვილი (Bold)', () => apply(x => (x.bold = !x.bold), 'bold'), p?.bold),
+        b('B', 'მუქი (Bold)', () => apply(x => (x.bold = !x.bold), 'bold'), p?.bold),
         b('I', 'დახრილი (Italic)', () => apply(x => (x.italic = !x.italic), 'italic'), p?.italic),
         b('U', 'ხაზგასმული (Underline)', () => apply(x => (x.underline = !x.underline), 'underline'), p?.underline),
       )
@@ -196,7 +196,7 @@ export function wordSim(host: HTMLElement, tasks: SimTask[], config: WordConfig,
       s.addEventListener('change', () => apply(x => (x.spacing = Number(s.value)), `spacing:${s.value}`))
       group(el('span', '', 'ინტერვალი:'), s)
     }
-    if (tools.has('indent')) group(b('⇥ აბზაცი', 'აბზაცის დაშორება', () => apply(x => (x.indent = !x.indent), 'indent'), p?.indent))
+    if (tools.has('indent')) group(b('⇥ აბზაცი', 'აბზაცის შეწევა', () => apply(x => (x.indent = !x.indent), 'indent'), p?.indent))
     if (tools.has('list')) {
       group(
         b('• სია', 'ბულეტები', () => apply(x => (x.list = x.list === 'bullets' ? '' : 'bullets'), 'bullets'), p?.list === 'bullets'),
@@ -275,8 +275,8 @@ export function wordSim(host: HTMLElement, tasks: SimTask[], config: WordConfig,
     }
     if (tools.has('save')) {
       group(
-        b('💾 Word (.docx)', 'შენახვა Word-ის ფორმატში', () => ((status = '💾 შეინახა: ჩემი დოკუმენტი.docx — შემდეგ ისევ შეგვიძლია მისი შეცვლა'), render(), emit('save:docx'))),
-        b('📕 PDF', 'შენახვა PDF-ად', () => ((status = '📕 შეინახა: ჩემი დოკუმენტი.pdf — ნებისმიერ მოწყობილობაზე ერთნაირად გამოჩნდება'), render(), emit('save:pdf'))),
+        b('💾 Word (.docx)', 'შენახვა Word-ის ფორმატში', () => ((status = '💾 შენახულია: ჩემი დოკუმენტი.docx — მისი შეცვლა მერეც შეიძლება'), render(), emit('save:docx'))),
+        b('📕 PDF', 'შენახვა PDF-ად', () => ((status = '📕 შენახულია: ჩემი დოკუმენტი.pdf — ნებისმიერ მოწყობილობაზე ერთნაირად გამოჩნდება'), render(), emit('save:pdf'))),
       )
     }
   }
@@ -348,7 +348,7 @@ export function wordSim(host: HTMLElement, tasks: SimTask[], config: WordConfig,
         if (clipboard) insert({ ...clipboard }, 'paste')
       },
       s: () => {
-        status = '💾 ფაილი შეინახა (Ctrl+S)'
+        status = '💾 ფაილი შენახულია (Ctrl+S)'
         render()
         emit('save:docx')
       },

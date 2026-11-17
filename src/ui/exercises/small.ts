@@ -322,7 +322,7 @@ export function circuitSim(host: HTMLElement, tasks: SimTask[], config: CircuitC
         info,
         mode === 'basic'
           ? closed
-            ? 'წრედი **შეკრულია** — დენი დადის და ნათურა ანთია.'
+            ? 'წრედი **შეკრულია** — დენი გადის და ნათურა ანთია.'
             : 'წრედი **გაწყვეტილია** — დენი ვერ გადის და ნათურა ჩამქრალია.'
           : material === null
             ? 'ჩადე ცარიელ ადგილას რომელიმე საგანი.'

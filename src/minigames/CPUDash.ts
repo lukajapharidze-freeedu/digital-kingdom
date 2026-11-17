@@ -253,7 +253,7 @@ const LEVELS: LevelConfig[] = [
     accent: '#ff2d55',
     theme: 'virus',
     sky: ['#1a0a1f', '#14081a', '#04010a'],
-    tip: 'ახალი: ცაზე ჩამოვარდნილი ბლოკები და სამმაგი ეკლები',
+    tip: 'ახალი: ციდან ჩამოვარდნილი ბლოკები და სამმაგი ეკლები',
     features: {
       ...NO_FEATURES,
       superBridge: 0.1,
