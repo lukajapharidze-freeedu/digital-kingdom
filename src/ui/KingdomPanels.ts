@@ -226,15 +226,6 @@ function pictureBox(picture: TopicPicture, tone: number): HTMLElement {
 
 const ROMAN: Record<Grade, string> = { 2: 'II', 3: 'III', 4: 'IV' }
 
-/** კლასის სათაური მასწავლებლის სიებში */
-function gradeHeading(grade: Grade): HTMLElement {
-  return make(
-    'div',
-    'margin: 8px 0 0; font-size: 18px; font-weight: 900; color: #315b88; border-bottom: 2px solid #d1dfeb; padding-bottom: 4px;',
-    `${ROMAN[grade]} კლასი`,
-  )
-}
-
 function row(...children: HTMLElement[]): HTMLDivElement {
   const box = make(
     'div',
@@ -256,6 +247,10 @@ export class KingdomPanels {
   private readerFit: (() => void) | null = null
   /** ამ სესიაში უკვე შესრულებული სავარჯიშოები (თემა:ტექსტი:გვერდი) — უკან დაბრუნებისას თავიდან არ ვითხოვთ */
   private readonly exercisesDone = new Set<string>()
+  /** მასწავლებლის ბიბლიოთეკაში ჩამოშლილი კლასები (დანარჩენი დაკეცილია) */
+  private readonly libraryOpenGrades = new Set<Grade>()
+  /** მასწავლებლის აკადემიაში ჩამოშლილი კლასები */
+  private readonly academyOpenGrades = new Set<Grade>()
 
   constructor(options: PanelsOptions) {
     this.state = options.state
@@ -375,11 +370,55 @@ export class KingdomPanels {
     return TEACHER_GRADES.flatMap(grade => topicsInLessonOrder(grade))
   }
 
-  /** მასწავლებლის სიაში კლასის სათაური ჩნდება იქ, სადაც ახალი კლასი იწყება */
-  private addGradeHeading(list: HTMLElement, topic: Topic, previous: Topic | undefined) {
-    if (!this.state.teacherMode) return
-    const grade = topic.grades[0]
-    if (previous?.grades[0] !== grade) list.appendChild(gradeHeading(grade))
+  /**
+   * მასწავლებლის სია კლასებად: ყოველი კლასი ცალკე ზოლია, რომელიც იშლება და იკეცება.
+   * open — ჩამოშლილი კლასები (ხელახლა გახსნისას ინახება), rerender — სიის თავიდან დახატვა.
+   */
+  private gradeAccordion(
+    card: HTMLElement,
+    list: HTMLElement,
+    topics: Topic[],
+    open: Set<Grade>,
+    topicItem: (topic: Topic) => HTMLElement,
+    rerender: () => void,
+  ) {
+    for (const grade of TEACHER_GRADES) {
+      const gradeTopics = topics.filter(t => t.grades[0] === grade)
+      if (gradeTopics.length === 0) continue
+      const isOpen = open.has(grade)
+      const toggle = make(
+        'button',
+        `
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          width: 100%;
+          padding: 14px 18px;
+          border: 2px solid ${isOpen ? '#315b88' : '#c9d6e4'};
+          border-radius: 14px;
+          background: ${isOpen ? '#e6f1fb' : 'rgba(255,255,255,0.9)'};
+          color: #26364a;
+          font-size: 19px;
+          font-weight: 900;
+          cursor: pointer;
+        `,
+      )
+      toggle.type = 'button'
+      toggle.append(
+        make('span', '', `${ROMAN[grade]} კლასი`),
+        make('span', 'font-size: 15px; color: #536579;', `${gradeTopics.length} თემა ${isOpen ? '▲' : '▼'}`),
+      )
+      toggle.addEventListener('click', () => {
+        if (isOpen) open.delete(grade)
+        else open.add(grade)
+        // ჩამოშლისას ფანჯარა იმავე ადგილას რჩება
+        const scroll = card.scrollTop
+        rerender()
+        card.scrollTop = scroll
+      })
+      list.appendChild(toggle)
+      if (isOpen) gradeTopics.forEach(topic => list.appendChild(topicItem(topic)))
+    }
   }
 
   // ---------- ბიბლიოთეკა ----------
@@ -407,10 +446,7 @@ export class KingdomPanels {
     }
 
     const list = make('div', 'display: grid; gap: 10px; text-align: left; margin-bottom: 18px;')
-    topics.forEach((topic, index) => {
-      if (!this.state.isTopicOpened(topic.id)) return
-      this.addGradeHeading(list, topic, topics[index - 1])
-
+    const topicItem = (topic: Topic) => {
       const item = make(
         'div',
         `
@@ -433,8 +469,19 @@ export class KingdomPanels {
         button('➕ დამატებითი ტექსტი', '#315b88', () => this.renderReader(topic, true, 0)),
       )
       item.append(info, actions)
-      list.appendChild(item)
-    })
+      return item
+    }
+
+    if (this.state.teacherMode) {
+      // მასწავლებელი ყველა კლასის თემას ხედავს — კლასებად, ჩამოსაშლელად
+      this.gradeAccordion(card, list, topics.filter(t => this.state.isTopicOpened(t.id)), this.libraryOpenGrades, topicItem, () =>
+        this.renderLibraryHome(),
+      )
+    } else {
+      topics.forEach(topic => {
+        if (this.state.isTopicOpened(topic.id)) list.appendChild(topicItem(topic))
+      })
+    }
     card.appendChild(list)
 
     const form = make('form', 'display: flex; justify-content: center; flex-wrap: wrap; gap: 10px;')
@@ -499,7 +546,8 @@ export class KingdomPanels {
     if (message) this.message(card, message, messageColor)
     this.footer(card)
 
-    setTimeout(() => input.focus(), 0)
+    // preventScroll: კლასის ჩამოშლისას ფანჯარა ქვემოთ, კოდის ველთან არ უნდა გადახტეს
+    setTimeout(() => input.focus({ preventScroll: true }), 0)
   }
 
   private renderReader(topic: Topic, extra: boolean, index: number) {
@@ -777,8 +825,7 @@ export class KingdomPanels {
     }
 
     const list = make('div', 'display: grid; gap: 12px; text-align: left; margin-bottom: 6px;')
-    opened.forEach((topic, index) => {
-      this.addGradeHeading(list, topic, opened[index - 1])
+    const topicItem = (topic: Topic) => {
       const item = make(
         'div',
         `
@@ -827,8 +874,13 @@ export class KingdomPanels {
           ),
         )
       }
-      list.appendChild(item)
-    })
+      return item
+    }
+    if (teacher) {
+      this.gradeAccordion(card, list, opened, this.academyOpenGrades, topicItem, () => this.renderAcademyHome())
+    } else {
+      opened.forEach(topic => list.appendChild(topicItem(topic)))
+    }
     card.appendChild(list)
 
     if (message) this.message(card, message, '#18834a')
